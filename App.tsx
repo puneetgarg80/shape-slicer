@@ -5,7 +5,7 @@ import { Piece, LevelData } from './types';
 import { ARENA_LEVELS, GYM_LEVELS, COLORS, START_OFFSET } from './constants';
 import { normalizePiece } from './utils/geometry';
 import { getGeminiHint } from './services/geminiService';
-import { X, PlayCircle, Plus, Dumbbell, Swords } from 'lucide-react';
+import { PlayCircle, Plus, Dumbbell, Swords } from 'lucide-react';
 
 type AppMode = 'ARENA' | 'GYM';
 
@@ -19,6 +19,12 @@ const App: React.FC = () => {
   const gymLevels = [...GYM_LEVELS, ...customLevels];
   const activeLevels = appMode === 'ARENA' ? arenaLevels : gymLevels;
   const currentLevel = activeLevels[levelIndex] || activeLevels[0];
+  
+  // Editor mode detection
+  const [isEditorMode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mode') === 'editor';
+  });
 
   // Game State
   const [pieces, setPieces] = useState<Piece[]>([]);
@@ -35,7 +41,6 @@ const App: React.FC = () => {
   const [hint, setHint] = useState<string | null>(null);
   const [showWinModal, setShowWinModal] = useState(false);
   const [isGameComplete, setIsGameComplete] = useState(false);
-  const [isLevelMenuOpen, setIsLevelMenuOpen] = useState(false);
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
 
   // Initialize Level
@@ -147,12 +152,11 @@ const App: React.FC = () => {
     }
     setShowWinModal(false);
   };
-
-  const handleLevelSelect = (index: number) => {
-    setLevelIndex(index);
-    setIsLevelMenuOpen(false);
-    setIsGameComplete(false);
-    setShowWinModal(false);
+  
+  const handlePrevLevel = () => {
+    if (levelIndex > 0) {
+      setLevelIndex(prev => prev - 1);
+    }
   };
 
   const handleRestartGame = () => {
@@ -176,7 +180,6 @@ const App: React.FC = () => {
     setAppMode('GYM');
     // Set index to the newly created level (end of GYM list)
     setLevelIndex(GYM_LEVELS.length + customLevels.length); 
-    setIsLevelMenuOpen(false);
   };
 
   if (isBuilderOpen) {
@@ -228,12 +231,6 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-white font-sans relative">
-      
-      {/* Top Mode Toggle Bar (Visible on larger screens or just below header? We'll integrate into Level Menu or just put it in header) 
-          Actually, let's put it at the very top or inside the menu. 
-          For visibility, let's put it in the menu as a segment control.
-      */}
-
       <GameCanvas 
         pieces={pieces}
         setPieces={handleSetPieces}
@@ -243,88 +240,24 @@ const App: React.FC = () => {
         onRequestHint={handleRequestHint}
         hint={hint}
         resetLevel={() => loadLevel(currentLevel, false)} // Don't reset cut stats on manual retry
-        onOpenLevelSelect={() => setIsLevelMenuOpen(true)}
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={historyIndex > 0}
         canRedo={historyIndex < history.length - 1}
         onCut={handleCutAction}
+        
+        // Navigation Props
+        appMode={appMode}
+        setAppMode={setAppMode}
+        levelIndex={levelIndex}
+        totalLevels={activeLevels.length}
+        onPrevLevel={handlePrevLevel}
+        onNextLevel={handleNextLevel}
+        
+        // Editor Props
+        isEditorMode={isEditorMode}
+        onCreateLevel={() => setIsBuilderOpen(true)}
       />
-
-      {/* LEVEL LADDER MENU */}
-      {isLevelMenuOpen && (
-        <div className="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-sm flex flex-col p-6 animate-fade-in">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-white tracking-tight">Level Ladder</h2>
-            <button 
-              onClick={() => setIsLevelMenuOpen(false)} 
-              className="p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition"
-            >
-              <X size={24} />
-            </button>
-          </div>
-
-          {/* MODE TOGGLE */}
-          <div className="flex bg-slate-900 p-1 rounded-xl mb-6 border border-slate-800">
-             <button 
-               onClick={() => { setAppMode('ARENA'); setLevelIndex(0); }}
-               className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${appMode === 'ARENA' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-500 hover:text-white'}`}
-             >
-                <Swords size={18} />
-                Arena
-             </button>
-             <button 
-               onClick={() => { setAppMode('GYM'); setLevelIndex(0); }}
-               className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${appMode === 'GYM' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-white'}`}
-             >
-                <Dumbbell size={18} />
-                Gym
-             </button>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto pr-2 space-y-3 pb-8">
-            {appMode === 'GYM' && (
-                <button 
-                  onClick={() => { setIsBuilderOpen(true); setIsLevelMenuOpen(false); }}
-                  className="w-full p-4 rounded-xl flex items-center justify-center gap-3 border-2 border-dashed border-slate-700 text-slate-400 hover:border-blue-500 hover:text-blue-400 hover:bg-slate-900 transition-all group"
-                >
-                  <Plus size={24} />
-                  <span className="font-bold">Create New Level</span>
-                </button>
-            )}
-
-            {activeLevels.map((level, idx) => {
-              const isActive = idx === levelIndex;
-              const isCustom = appMode === 'GYM' && idx >= GYM_LEVELS.length;
-              
-              return (
-                <button
-                  key={level.id}
-                  onClick={() => handleLevelSelect(idx)}
-                  className={`w-full p-4 rounded-xl flex items-center justify-between border-2 transition-all group ${
-                    isActive 
-                      ? 'bg-slate-800 border-white/20 shadow-lg' 
-                      : 'bg-slate-900 border-slate-800 hover:border-slate-600 hover:bg-slate-800'
-                  }`}
-                >
-                   <div className="flex items-center gap-4">
-                      <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold ${isActive ? (appMode === 'ARENA' ? 'bg-rose-600 text-white' : 'bg-blue-600 text-white') : 'bg-slate-800 text-slate-500'}`}>
-                        {idx + 1}
-                      </div>
-                      <div className="text-left">
-                        <span className={`block text-xs font-bold uppercase tracking-wider ${isActive ? (appMode === 'ARENA' ? 'text-rose-400' : 'text-blue-400') : 'text-slate-500'}`}>
-                          {isCustom ? 'Custom' : (appMode === 'ARENA' ? 'Challenge' : 'Practice')}
-                        </span>
-                        <span className={`text-lg font-bold ${isActive ? 'text-white' : 'text-slate-300'}`}>{level.name}</span>
-                      </div>
-                   </div>
-                   {isActive && <PlayCircle className={appMode === 'ARENA' ? 'text-rose-500' : 'text-blue-500'} size={24} fill="currentColor" color="white" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* STRUGGLE MODAL */}
       {showStruggleModal && (

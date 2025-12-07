@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Piece, Cell, Coordinate, GameMode } from '../types';
 import { getAbsoluteCells, performCut, pointsToEdges, interpolatePoints, checkSolution, getEdgeAsKey, parseEdgeKey } from '../utils/geometry';
 import { CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, DEFAULT_TARGET_OFFSET, COLORS } from '../constants';
-import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, FlipVertical, Sparkles, RefreshCw, Menu, Undo, Redo, PenTool, Eraser, Trash2, Info, X, Target } from 'lucide-react';
+import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, FlipVertical, Sparkles, RefreshCw, Undo, Redo, PenTool, Eraser, Trash2, Info, X, Target, Swords, Dumbbell, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 interface GameCanvasProps {
   pieces: Piece[];
@@ -13,12 +13,20 @@ interface GameCanvasProps {
   onRequestHint: () => void;
   hint: string | null;
   resetLevel: () => void;
-  onOpenLevelSelect: () => void;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  onCut?: () => void; // New prop for tracking cuts
+  onCut?: () => void;
+  // New props for UI Redesign
+  appMode: 'ARENA' | 'GYM';
+  setAppMode: (mode: 'ARENA' | 'GYM') => void;
+  levelIndex: number;
+  totalLevels: number;
+  onPrevLevel: () => void;
+  onNextLevel: () => void;
+  isEditorMode: boolean;
+  onCreateLevel: () => void;
 }
 
 // Helper to calculate center of piece's bounding box in absolute grid coords
@@ -34,8 +42,9 @@ const getPieceCenter = (p: Piece): Coordinate => {
 };
 
 const GameCanvas: React.FC<GameCanvasProps> = ({ 
-  pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hint, resetLevel, onOpenLevelSelect,
-  onUndo, onRedo, canUndo, canRedo, onCut
+  pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hint, resetLevel,
+  onUndo, onRedo, canUndo, canRedo, onCut,
+  appMode, setAppMode, levelIndex, totalLevels, onPrevLevel, onNextLevel, isEditorMode, onCreateLevel
 }) => {
   const [mode, setMode] = useState<GameMode>(GameMode.MOVE);
   const [showRules, setShowRules] = useState(false);
@@ -331,68 +340,106 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     <div className="flex flex-col h-full w-full max-w-md mx-auto relative bg-puzzle-bg overflow-hidden touch-none select-none">
       
       {/* --- HEADER --- */}
-      <div className="flex justify-between items-center p-4 z-10 bg-slate-900/80 backdrop-blur border-b border-slate-700">
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={onOpenLevelSelect}
-            className="p-2 -ml-2 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition"
-            aria-label="Level Menu"
-          >
-            <Menu size={24} />
-          </button>
+      <div className="flex flex-col bg-slate-900/80 backdrop-blur border-b border-slate-700 z-10">
+        <div className="flex justify-between items-center p-3">
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">Shape Slicer</h1>
             <div className="text-xs text-slate-400">Match the target shape</div>
           </div>
+          <div className="flex gap-1">
+              <button 
+                onClick={() => setShowRules(true)}
+                className="p-2 rounded-full text-slate-400 hover:bg-slate-800 hover:text-white transition"
+                aria-label="Rules"
+              >
+                <Info size={18} />
+              </button>
+              <button 
+                onClick={onUndo} 
+                disabled={!canUndo}
+                className={`p-2 rounded-full transition ${canUndo ? 'text-slate-200 hover:bg-slate-700 active:scale-95' : 'text-slate-700'}`}
+                aria-label="Undo"
+              >
+                <Undo size={18} />
+              </button>
+              <button 
+                onClick={onRedo} 
+                disabled={!canRedo}
+                className={`p-2 rounded-full transition ${canRedo ? 'text-slate-200 hover:bg-slate-700 active:scale-95' : 'text-slate-700'}`}
+                aria-label="Redo"
+              >
+                <Redo size={18} />
+              </button>
+              <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
+              <button onClick={handleResetLevel} className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 active:scale-95 transition">
+                <RefreshCw size={18} />
+              </button>
+              <button 
+                onClick={onRequestHint} 
+                disabled={!!hint}
+                className={`p-2 rounded-full transition active:scale-95 ${hint ? 'bg-purple-900 text-purple-300' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}
+              >
+                <Sparkles size={18} />
+              </button>
+          </div>
         </div>
-        <div className="flex gap-1">
-            <button 
-              onClick={() => setShowRules(true)}
-              className="p-2 rounded-full text-slate-400 hover:bg-slate-800 hover:text-white transition"
-              aria-label="Rules"
-            >
-              <Info size={18} />
-            </button>
-            <button 
-              onClick={onUndo} 
-              disabled={!canUndo}
-              className={`p-2 rounded-full transition ${canUndo ? 'text-slate-200 hover:bg-slate-700 active:scale-95' : 'text-slate-700'}`}
-              aria-label="Undo"
-            >
-              <Undo size={18} />
-            </button>
-            <button 
-              onClick={onRedo} 
-              disabled={!canRedo}
-              className={`p-2 rounded-full transition ${canRedo ? 'text-slate-200 hover:bg-slate-700 active:scale-95' : 'text-slate-700'}`}
-              aria-label="Redo"
-            >
-              <Redo size={18} />
-            </button>
-            <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-            <button onClick={handleResetLevel} className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 active:scale-95 transition">
-              <RefreshCw size={18} />
-            </button>
-            <button 
-              onClick={onRequestHint} 
-              disabled={!!hint}
-              className={`p-2 rounded-full transition active:scale-95 ${hint ? 'bg-purple-900 text-purple-300' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}
-            >
-              <Sparkles size={18} />
-            </button>
+
+        {/* --- SUBHEADER (TOGGLE & NAV) --- */}
+        <div className="flex items-center justify-between px-3 pb-3">
+           <div className="flex bg-slate-800 p-1 rounded-lg">
+             <button 
+               onClick={() => setAppMode('ARENA')}
+               className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${appMode === 'ARENA' ? 'bg-rose-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+             >
+                <Swords size={14} /> Arena
+             </button>
+             <button 
+               onClick={() => setAppMode('GYM')}
+               className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${appMode === 'GYM' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+             >
+                <Dumbbell size={14} /> Gym
+             </button>
+           </div>
+
+           <div className="flex items-center gap-2">
+             {/* Gym Navigation */}
+             {appMode === 'GYM' && (
+               <div className="flex items-center bg-slate-800 rounded-lg p-1">
+                 <button onClick={onPrevLevel} disabled={levelIndex === 0} className="p-1 rounded hover:bg-slate-700 disabled:opacity-30">
+                    <ChevronLeft size={16} />
+                 </button>
+                 <span className="text-xs font-bold px-2 text-slate-300 min-w-[3rem] text-center">
+                    {levelIndex + 1} / {totalLevels}
+                 </span>
+                 <button onClick={onNextLevel} disabled={levelIndex === totalLevels - 1} className="p-1 rounded hover:bg-slate-700 disabled:opacity-30">
+                    <ChevronRight size={16} />
+                 </button>
+               </div>
+             )}
+
+             {/* Editor Button */}
+             {isEditorMode && (
+               <button 
+                 onClick={onCreateLevel}
+                 className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+               >
+                 <Plus size={14} /> Create
+               </button>
+             )}
+           </div>
         </div>
       </div>
 
       {/* --- HINT --- */}
       {hint && (
-        <div className="absolute top-20 left-4 right-4 z-20 bg-purple-900/90 text-purple-100 p-3 rounded-lg text-sm border border-purple-500 shadow-xl animate-bounce-slight">
+        <div className="absolute top-28 left-4 right-4 z-20 bg-purple-900/90 text-purple-100 p-3 rounded-lg text-sm border border-purple-500 shadow-xl animate-bounce-slight">
           <strong>AI Hint:</strong> {hint}
         </div>
       )}
 
       {/* --- FLOATING ACTION BUTTONS --- */}
       {drawnEdges.size > 0 && (
-         <div className="absolute top-24 right-4 z-30 flex flex-col gap-2 animate-fade-in">
+         <div className="absolute top-32 right-4 z-30 flex flex-col gap-2 animate-fade-in">
              <button 
                 onClick={executeCut}
                 className="w-12 h-12 rounded-full bg-rose-600 hover:bg-rose-500 text-white shadow-lg flex items-center justify-center animate-bounce-slight"
