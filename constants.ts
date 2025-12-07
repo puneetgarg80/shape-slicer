@@ -61,6 +61,21 @@ export const LEVELS: LevelData[] = [
       ...rect(1, 1).map(c => ({x: c.x + 6, y: c.y + 8})),
     ],
     targetOffset: { x: 2, y: 13 } // Bottom
+  },
+  {
+    id: 'practice-level-3',
+    name: 'Practice3',
+    par: 1,
+    targetCells: rect(8, 8), // 8x8 Square (64)
+    initialShape: [
+      ...rect(8, 7), // Top 7 rows
+      // 8th row
+      ...rect(1, 1).map(c => ({x: c.x, y: c.y + 7})),
+      ...rect(6, 1).map(c => ({x: c.x + 2, y: c.y + 7})),
+      // 9th row
+      ...rect(1, 1).map(c => ({x: c.x + 3, y: c.y + 8})),
+    ],
+    targetOffset: { x: 2, y: 13 } // Bottom
   }
 ];
 

@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Piece, Cell, Coordinate, GameMode } from '../types';
 import { getAbsoluteCells, performCut, pointsToEdges, interpolatePoints, checkSolution, getEdgeAsKey, parseEdgeKey } from '../utils/geometry';
 import { CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, DEFAULT_TARGET_OFFSET, COLORS } from '../constants';
-import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, Sparkles, RefreshCw, Menu, Undo, Redo, PenTool, Eraser, Trash2, Info, X, Target } from 'lucide-react';
+import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, FlipVertical, Sparkles, RefreshCw, Menu, Undo, Redo, PenTool, Eraser, Trash2, Info, X, Target } from 'lucide-react';
 
 interface GameCanvasProps {
   pieces: Piece[];
@@ -228,7 +228,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     setDrawnEdges(new Set());
   };
 
-  const rotateSelected = (dir: 1 | -1) => {
+  const handleRotate = (dir: 1 | -1) => {
     if (!selectedPieceId) return;
     setPieces(prev => {
       const piece = prev.find(p => p.id === selectedPieceId);
@@ -264,13 +264,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     });
   };
 
-  const flipSelected = () => {
+  const handleFlipHorizontal = () => {
     if (!selectedPieceId) return;
     setPieces(prev => {
       const piece = prev.find(p => p.id === selectedPieceId);
       if (!piece) return prev;
 
       const oldCenter = getPieceCenter(piece);
+      // Toggle flip state
       const tempPiece = { ...piece, isFlipped: !piece.isFlipped };
       const newNaturalCenter = getPieceCenter(tempPiece);
 
@@ -279,7 +280,43 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
       return prev.map(p => {
         if (p.id === selectedPieceId) {
-          return { ...p, isFlipped: !p.isFlipped, position: { x: p.position.x + offsetX, y: p.position.y + offsetY } };
+          return { 
+            ...p, 
+            isFlipped: !p.isFlipped, 
+            position: { x: p.position.x + offsetX, y: p.position.y + offsetY } 
+          };
+        }
+        return p;
+      });
+    });
+  };
+
+  const handleFlipVertical = () => {
+    if (!selectedPieceId) return;
+    setPieces(prev => {
+      const piece = prev.find(p => p.id === selectedPieceId);
+      if (!piece) return prev;
+
+      const oldCenter = getPieceCenter(piece);
+      
+      // Vertical flip = Horizontal Flip + 180 degree rotation
+      const newIsFlipped = !piece.isFlipped;
+      const newRotation = (piece.rotation + 180) % 360;
+
+      const tempPiece = { ...piece, isFlipped: newIsFlipped, rotation: newRotation };
+      const newNaturalCenter = getPieceCenter(tempPiece);
+
+      const offsetX = Math.round(oldCenter.x - newNaturalCenter.x);
+      const offsetY = Math.round(oldCenter.y - newNaturalCenter.y);
+
+      return prev.map(p => {
+        if (p.id === selectedPieceId) {
+          return { 
+            ...p, 
+            isFlipped: newIsFlipped, 
+            rotation: newRotation,
+            position: { x: p.position.x + offsetX, y: p.position.y + offsetY } 
+          };
         }
         return p;
       });
@@ -301,7 +338,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           </button>
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">Shape Slicer</h1>
-            <div className="text-xs text-slate-400">Match the ghost shape</div>
+            <div className="text-xs text-slate-400">Match the target shape</div>
           </div>
         </div>
         <div className="flex gap-1">
@@ -513,21 +550,28 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
           {/* Manipulation Controls (Only visible in Move Mode) */}
           <div className={`flex justify-between items-center px-4 transition-all duration-300 ${mode === GameMode.MOVE && selectedPieceId ? 'opacity-100 translate-y-0 h-16' : 'opacity-0 translate-y-4 h-0 pointer-events-none'}`}>
-             <button onClick={() => rotateSelected(-1)} className="flex flex-col items-center gap-1 text-slate-300 active:text-white active:scale-95 transition">
+             <button onClick={() => handleRotate(-1)} className="flex flex-col items-center gap-1 text-slate-300 active:text-white active:scale-95 transition">
                <div className="p-3 bg-slate-800 rounded-full border border-slate-600 shadow-sm">
                  <RotateCcw size={20} />
                </div>
                <span className="text-[10px] font-bold tracking-wider">LEFT</span>
              </button>
 
-             <button onClick={() => flipSelected()} className="flex flex-col items-center gap-1 text-slate-300 active:text-white active:scale-95 transition">
+             <button onClick={() => handleFlipHorizontal()} className="flex flex-col items-center gap-1 text-slate-300 active:text-white active:scale-95 transition">
                <div className="p-3 bg-slate-800 rounded-full border border-slate-600 shadow-sm">
                  <FlipHorizontal size={20} />
                </div>
-               <span className="text-[10px] font-bold tracking-wider">FLIP</span>
+               <span className="text-[10px] font-bold tracking-wider">H.FLIP</span>
              </button>
 
-             <button onClick={() => rotateSelected(1)} className="flex flex-col items-center gap-1 text-slate-300 active:text-white active:scale-95 transition">
+             <button onClick={() => handleFlipVertical()} className="flex flex-col items-center gap-1 text-slate-300 active:text-white active:scale-95 transition">
+               <div className="p-3 bg-slate-800 rounded-full border border-slate-600 shadow-sm">
+                 <FlipVertical size={20} />
+               </div>
+               <span className="text-[10px] font-bold tracking-wider">V.FLIP</span>
+             </button>
+
+             <button onClick={() => handleRotate(1)} className="flex flex-col items-center gap-1 text-slate-300 active:text-white active:scale-95 transition">
                <div className="p-3 bg-slate-800 rounded-full border border-slate-600 shadow-sm">
                  <RotateCw size={20} />
                </div>
