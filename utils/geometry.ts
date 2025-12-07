@@ -48,6 +48,10 @@ export const normalizePiece = (cells: Cell[]): { normalized: Cell[], offset: Coo
 
 // Check if pieces match the target shape exactly
 export const checkSolution = (pieces: Piece[], targetCells: Cell[], targetOffset: Coordinate): boolean => {
+  // Enforce puzzle constraints: Exactly 2 pieces, minimum 3 cells each
+  if (pieces.length !== 2) return false;
+  if (pieces.some(p => p.cells.length < 3)) return false;
+
   const occupied = new Set<string>();
   
   // Calculate all occupied cells by pieces

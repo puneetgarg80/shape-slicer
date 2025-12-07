@@ -58,7 +58,11 @@ export const getGeminiHint = async (
     
     ${gridStr}
 
-    The goal is to cut this shape into 2 pieces and rearrange them to form a perfect 6x6 square.
+    The goal is to cut this shape into exactly 2 pieces and rearrange them to form the target shape.
+    
+    Constraints:
+    1. The solution must consist of exactly 2 pieces.
+    2. Each piece must have at least 3 grid cells.
     
     Current state: ${pieces.length} pieces.
     
