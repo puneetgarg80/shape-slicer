@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Piece, Cell, Coordinate, GameMode } from '../types';
 import { getAbsoluteCells, performCut, pointsToEdges, interpolatePoints, checkSolution, getEdgeAsKey, parseEdgeKey } from '../utils/geometry';
 import { CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, DEFAULT_TARGET_OFFSET, COLORS } from '../constants';
-import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, Sparkles, RefreshCw, Menu, Undo, Redo, PenTool, Eraser, Trash2 } from 'lucide-react';
+import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, Sparkles, RefreshCw, Menu, Undo, Redo, PenTool, Eraser, Trash2, Info, X, Target } from 'lucide-react';
 
 interface GameCanvasProps {
   pieces: Piece[];
@@ -37,6 +37,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   onUndo, onRedo, canUndo, canRedo
 }) => {
   const [mode, setMode] = useState<GameMode>(GameMode.MOVE);
+  const [showRules, setShowRules] = useState(false);
   
   // Selection & Moving
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
@@ -305,6 +306,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         </div>
         <div className="flex gap-1">
             <button 
+              onClick={() => setShowRules(true)}
+              className="p-2 rounded-full text-slate-400 hover:bg-slate-800 hover:text-white transition"
+              aria-label="Rules"
+            >
+              <Info size={18} />
+            </button>
+            <button 
               onClick={onUndo} 
               disabled={!canUndo}
               className={`p-2 rounded-full transition ${canUndo ? 'text-slate-200 hover:bg-slate-700 active:scale-95' : 'text-slate-700'}`}
@@ -535,6 +543,37 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           )}
         </div>
       </div>
+
+      {/* --- RULES MODAL --- */}
+      {showRules && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setShowRules(false)}>
+            <div className="bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-600 max-w-sm w-full relative" onClick={e => e.stopPropagation()}>
+                <button onClick={() => setShowRules(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X size={24}/></button>
+                <h2 className="text-2xl font-bold text-white mb-4">How to Play</h2>
+                <ul className="space-y-3 text-slate-300 text-sm">
+                    <li className="flex gap-3 items-start">
+                        <div className="bg-rose-600/20 text-rose-400 p-2 rounded-lg h-fit"><Scissors size={16}/></div>
+                        <div><strong className="text-white block">Cut</strong> Slice shapes along grid lines using the Pen tool.</div>
+                    </li>
+                    <li className="flex gap-3 items-start">
+                        <div className="bg-blue-600/20 text-blue-400 p-2 rounded-lg h-fit"><Move size={16}/></div>
+                        <div><strong className="text-white block">Move</strong> Drag pieces into the target area.</div>
+                    </li>
+                    <li className="flex gap-3 items-start">
+                        <div className="bg-purple-600/20 text-purple-400 p-2 rounded-lg h-fit"><RotateCw size={16}/></div>
+                        <div><strong className="text-white block">Transform</strong> Rotate and Flip pieces to fit.</div>
+                    </li>
+                    <li className="flex gap-3 items-start">
+                        <div className="bg-green-600/20 text-green-400 p-2 rounded-lg h-fit"><Target size={16}/></div>
+                        <div><strong className="text-white block">Goal</strong> Fit all pieces into the dotted outline perfectly.</div>
+                    </li>
+                </ul>
+                <div className="mt-6 pt-4 border-t border-slate-700 text-center">
+                    <button onClick={() => setShowRules(false)} className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full font-bold text-sm transition">Got it</button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };
