@@ -180,7 +180,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       setDragPosition(null);
 
       const updatedPieces = pieces.map(p => p.id === selectedPieceId ? { ...p, position: { x: newGridX, y: newGridY } } : p);
-      if (checkSolution(updatedPieces, targetCells, finalTargetOffset)) {
+      if (checkSolution(updatedPieces, targetCells)) {
         onWin();
       }
 
@@ -557,7 +557,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                     </li>
                     <li className="flex gap-3 items-start">
                         <div className="bg-blue-600/20 text-blue-400 p-2 rounded-lg h-fit"><Move size={16}/></div>
-                        <div><strong className="text-white block">Move</strong> Drag pieces into the target area.</div>
+                        <div><strong className="text-white block">Move</strong> Drag pieces to arrange them.</div>
                     </li>
                     <li className="flex gap-3 items-start">
                         <div className="bg-purple-600/20 text-purple-400 p-2 rounded-lg h-fit"><RotateCw size={16}/></div>
@@ -565,7 +565,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                     </li>
                     <li className="flex gap-3 items-start">
                         <div className="bg-green-600/20 text-green-400 p-2 rounded-lg h-fit"><Target size={16}/></div>
-                        <div><strong className="text-white block">Goal</strong> Fit all pieces into the dotted outline perfectly.</div>
+                        <div><strong className="text-white block">Goal</strong> Form the target shape anywhere on the grid.</div>
                     </li>
                 </ul>
                 <div className="mt-6 pt-4 border-t border-slate-700 text-center">

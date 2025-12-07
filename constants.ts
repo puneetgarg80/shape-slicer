@@ -16,15 +16,7 @@ const rect = (w: number, h: number) => {
 
 export const LEVELS: LevelData[] = [
   {
-    id: 'level-1',
-    name: 'The Plank',
-    par: 1,
-    targetCells: rect(4, 4), // 4x4 Square (16)
-    initialShape: rect(8, 2), // 8x2 Rectangle (16)
-    targetOffset: { x: 4, y: 15 } // Bottom
-  },
-  {
-    id: 'level-5',
+    id: 'main-challenge',
     name: 'ZigZag',
     par: 1,
     targetCells: rect(8, 8), // 8x8 Square (64)
@@ -40,7 +32,7 @@ export const LEVELS: LevelData[] = [
     targetOffset: { x: 2, y: 13 } // Bottom
   },
   {
-    id: 'level-6',
+    id: 'practice-level-1',
     name: 'Practice1',
     par: 1,
     targetCells: rect(8, 8), // 8x8 Square (64)
@@ -56,7 +48,7 @@ export const LEVELS: LevelData[] = [
     targetOffset: { x: 2, y: 13 } // Bottom
   },
   {
-    id: 'level-7',
+    id: 'practice-level-2',
     name: 'Practice2',
     par: 1,
     targetCells: rect(8, 8), // 8x8 Square (64)

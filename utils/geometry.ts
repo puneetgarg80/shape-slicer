@@ -46,32 +46,30 @@ export const normalizePiece = (cells: Cell[]): { normalized: Cell[], offset: Coo
   };
 };
 
-// Check if pieces match the target shape exactly
-export const checkSolution = (pieces: Piece[], targetCells: Cell[], targetOffset: Coordinate): boolean => {
+// Check if pieces match the target shape exactly (position independent)
+export const checkSolution = (pieces: Piece[], targetCells: Cell[]): boolean => {
   // Enforce puzzle constraints: Exactly 2 pieces, minimum 3 cells each
   if (pieces.length !== 2) return false;
   if (pieces.some(p => p.cells.length < 3)) return false;
 
-  const occupied = new Set<string>();
+  const allAbsCells = pieces.flatMap(getAbsoluteCells);
+  if (allAbsCells.length === 0) return false;
+
+  // Normalize current arrangement to (0,0) to compare shape only, ignoring position
+  const { normalized: currentShape } = normalizePiece(allAbsCells);
+
+  // Normalize target shape to (0,0) as well for fair comparison
+  const { normalized: targetShape } = normalizePiece(targetCells);
+
+  // Quick count check
+  if (currentShape.length !== targetShape.length) return false;
+
+  // Convert to set for O(1) lookups
+  const currentSet = new Set(currentShape.map(c => `${c.x},${c.y}`));
   
-  // Calculate all occupied cells by pieces
-  for (const p of pieces) {
-    const absCells = getAbsoluteCells(p);
-    for (const c of absCells) {
-      occupied.add(`${c.x},${c.y}`);
-    }
-  }
-
-  // Calculate expected target cells in absolute coordinates
-  const targetSet = new Set<string>();
-  for (const c of targetCells) {
-    targetSet.add(`${c.x + targetOffset.x},${c.y + targetOffset.y}`);
-  }
-
-  if (occupied.size !== targetSet.size) return false;
-
-  for (const key of occupied) {
-    if (!targetSet.has(key)) return false;
+  // Verify every cell in target exists in current configuration
+  for (const c of targetShape) {
+    if (!currentSet.has(`${c.x},${c.y}`)) return false;
   }
 
   return true;
