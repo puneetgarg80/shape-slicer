@@ -18,6 +18,7 @@ interface GameCanvasProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  onCut?: () => void; // New prop for tracking cuts
 }
 
 // Helper to calculate center of piece's bounding box in absolute grid coords
@@ -34,7 +35,7 @@ const getPieceCenter = (p: Piece): Coordinate => {
 
 const GameCanvas: React.FC<GameCanvasProps> = ({ 
   pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hint, resetLevel, onOpenLevelSelect,
-  onUndo, onRedo, canUndo, canRedo
+  onUndo, onRedo, canUndo, canRedo, onCut
 }) => {
   const [mode, setMode] = useState<GameMode>(GameMode.MOVE);
   const [showRules, setShowRules] = useState(false);
@@ -218,6 +219,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       setPieces(newPiecesList);
       setMode(GameMode.MOVE);
       if (piecesToAdd.length > 0) setSelectedPieceId(piecesToAdd[0].id);
+      
+      // Notify parent about the cut
+      if (onCut) onCut();
     }
     
     // Clear drawing after attempt

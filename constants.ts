@@ -14,10 +14,10 @@ const rect = (w: number, h: number) => {
   }));
 };
 
-export const LEVELS: LevelData[] = [
+export const ARENA_LEVELS: LevelData[] = [
   {
     id: 'main-challenge',
-    name: 'ZigZag',
+    name: 'ZigZag Challenge',
     par: 1,
     targetCells: rect(8, 8), // 8x8 Square (64)
     initialShape: [
@@ -30,10 +30,13 @@ export const LEVELS: LevelData[] = [
       ...rect(1, 1).map(c => ({x: c.x + 6, y: c.y + 8})),
     ],
     targetOffset: { x: 2, y: 13 } // Bottom
-  },
+  }
+];
+
+export const GYM_LEVELS: LevelData[] = [
   {
     id: 'practice-level-1',
-    name: 'Practice1',
+    name: 'Gym: Basics I',
     par: 1,
     targetCells: rect(8, 8), // 8x8 Square (64)
     initialShape: [
@@ -49,7 +52,7 @@ export const LEVELS: LevelData[] = [
   },
   {
     id: 'practice-level-2',
-    name: 'Practice2',
+    name: 'Gym: Basics II',
     par: 1,
     targetCells: rect(8, 8), // 8x8 Square (64)
     initialShape: [
@@ -64,7 +67,7 @@ export const LEVELS: LevelData[] = [
   },
   {
     id: 'practice-level-3',
-    name: 'Practice3',
+    name: 'Gym: Basics III',
     par: 1,
     targetCells: rect(8, 8), // 8x8 Square (64)
     initialShape: [
@@ -78,6 +81,9 @@ export const LEVELS: LevelData[] = [
     targetOffset: { x: 2, y: 13 } // Bottom
   }
 ];
+
+// Combine for backward compatibility if needed, though App.tsx handles separation
+export const LEVELS = [...ARENA_LEVELS, ...GYM_LEVELS];
 
 // Colors
 export const COLORS = [

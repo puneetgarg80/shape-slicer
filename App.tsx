@@ -2,18 +2,23 @@ import React, { useState, useEffect } from 'react';
 import GameCanvas from './components/GameCanvas';
 import LevelBuilder from './components/LevelBuilder';
 import { Piece, LevelData } from './types';
-import { LEVELS, COLORS, START_OFFSET } from './constants';
+import { ARENA_LEVELS, GYM_LEVELS, COLORS, START_OFFSET } from './constants';
 import { normalizePiece } from './utils/geometry';
 import { getGeminiHint } from './services/geminiService';
-import { X, PlayCircle, Plus } from 'lucide-react';
+import { X, PlayCircle, Plus, Dumbbell, Swords } from 'lucide-react';
+
+type AppMode = 'ARENA' | 'GYM';
 
 const App: React.FC = () => {
+  const [appMode, setAppMode] = useState<AppMode>('ARENA');
   const [customLevels, setCustomLevels] = useState<LevelData[]>([]);
   const [levelIndex, setLevelIndex] = useState(0);
   
-  // Combine builtin and custom levels
-  const allLevels = [...LEVELS, ...customLevels];
-  const currentLevel = allLevels[levelIndex];
+  // Levels based on Mode
+  const arenaLevels = ARENA_LEVELS;
+  const gymLevels = [...GYM_LEVELS, ...customLevels];
+  const activeLevels = appMode === 'ARENA' ? arenaLevels : gymLevels;
+  const currentLevel = activeLevels[levelIndex] || activeLevels[0];
 
   // Game State
   const [pieces, setPieces] = useState<Piece[]>([]);
@@ -21,6 +26,11 @@ const App: React.FC = () => {
   // History State
   const [history, setHistory] = useState<Piece[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+
+  // Struggle Detection
+  const [cutCount, setCutCount] = useState(0);
+  const [hasShownStrugglePrompt, setHasShownStrugglePrompt] = useState(false);
+  const [showStruggleModal, setShowStruggleModal] = useState(false);
 
   const [hint, setHint] = useState<string | null>(null);
   const [showWinModal, setShowWinModal] = useState(false);
@@ -31,11 +41,11 @@ const App: React.FC = () => {
   // Initialize Level
   useEffect(() => {
     if (currentLevel) {
-      loadLevel(currentLevel);
+      loadLevel(currentLevel, true);
     }
-  }, [currentLevel]);
+  }, [currentLevel, appMode]);
 
-  const loadLevel = (level: LevelData) => {
+  const loadLevel = (level: LevelData, resetStats: boolean = true) => {
     const { normalized } = normalizePiece(level.initialShape);
     
     // Use the level's defined start offset if it exists (for custom levels), otherwise use default
@@ -48,7 +58,7 @@ const App: React.FC = () => {
       position: startPos,
       rotation: 0,
       isFlipped: false,
-      color: COLORS[levelIndex % COLORS.length],
+      color: COLORS[(levelIndex + (appMode === 'GYM' ? 1 : 0)) % COLORS.length],
     };
 
     const initialPieces = [initialPiece];
@@ -57,6 +67,31 @@ const App: React.FC = () => {
     setHistoryIndex(0);
     setHint(null);
     setShowWinModal(false);
+    
+    // Reset struggle state only if requested (i.e., new level, not just a retry)
+    if (resetStats) {
+      setCutCount(0);
+      setHasShownStrugglePrompt(false);
+      setShowStruggleModal(false);
+    }
+  };
+
+  const handleCutAction = () => {
+    const newCount = cutCount + 1;
+    setCutCount(newCount);
+
+    // Check for struggle in Arena mode
+    // If cuts > 5 and we haven't bugged them yet
+    if (appMode === 'ARENA' && newCount > 5 && !hasShownStrugglePrompt) {
+        setShowStruggleModal(true);
+        setHasShownStrugglePrompt(true);
+    }
+  };
+
+  const switchToGym = () => {
+    setShowStruggleModal(false);
+    setAppMode('GYM');
+    setLevelIndex(0); // Start from first gym level
   };
 
   // Custom setter to manage history
@@ -105,7 +140,7 @@ const App: React.FC = () => {
   };
 
   const handleNextLevel = () => {
-    if (levelIndex < allLevels.length - 1) {
+    if (levelIndex < activeLevels.length - 1) {
       setLevelIndex(prev => prev + 1);
     } else {
       setIsGameComplete(true);
@@ -137,8 +172,10 @@ const App: React.FC = () => {
   const handleSaveCustomLevel = (newLevel: LevelData) => {
     setCustomLevels(prev => [...prev, newLevel]);
     setIsBuilderOpen(false);
-    // Switch to the new level immediately
-    setLevelIndex(LEVELS.length + customLevels.length); 
+    // Switch to GYM mode where custom levels live
+    setAppMode('GYM');
+    // Set index to the newly created level (end of GYM list)
+    setLevelIndex(GYM_LEVELS.length + customLevels.length); 
     setIsLevelMenuOpen(false);
   };
 
@@ -158,16 +195,32 @@ const App: React.FC = () => {
         <div className="h-screen w-screen bg-slate-950 text-white font-sans flex items-center justify-center p-4">
              <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-yellow-500 max-w-sm w-full text-center">
                 <div className="w-20 h-20 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-yellow-500/50">
-                   <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                   <Swords className="w-10 h-10 text-white" />
                 </div>
-                <h1 className="text-4xl font-bold text-white mb-2">Grandmaster!</h1>
-                <p className="text-slate-300 mb-8">You have sliced and solved every puzzle.</p>
-                <button 
-                  onClick={handleRestartGame}
-                  className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg transition transform active:scale-95"
-                >
-                  Play Again
-                </button>
+                <h1 className="text-4xl font-bold text-white mb-2">
+                    {appMode === 'ARENA' ? 'Arena Conquered!' : 'Gym Completed!'}
+                </h1>
+                <p className="text-slate-300 mb-8">
+                    {appMode === 'ARENA' 
+                        ? 'You have defeated the main challenge.' 
+                        : 'You have mastered all practice techniques.'}
+                </p>
+                <div className="space-y-3">
+                    <button 
+                      onClick={handleRestartGame}
+                      className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg transition transform active:scale-95"
+                    >
+                      Play Again
+                    </button>
+                    {appMode === 'GYM' && (
+                        <button 
+                            onClick={() => { setAppMode('ARENA'); setLevelIndex(0); setIsGameComplete(false); }}
+                            className="w-full py-4 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold text-lg shadow-lg transition transform active:scale-95"
+                        >
+                            Return to Arena
+                        </button>
+                    )}
+                </div>
              </div>
         </div>
      );
@@ -175,6 +228,12 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-white font-sans relative">
+      
+      {/* Top Mode Toggle Bar (Visible on larger screens or just below header? We'll integrate into Level Menu or just put it in header) 
+          Actually, let's put it at the very top or inside the menu. 
+          For visibility, let's put it in the menu as a segment control.
+      */}
+
       <GameCanvas 
         pieces={pieces}
         setPieces={handleSetPieces}
@@ -183,12 +242,13 @@ const App: React.FC = () => {
         onWin={handleWin}
         onRequestHint={handleRequestHint}
         hint={hint}
-        resetLevel={() => loadLevel(currentLevel)}
+        resetLevel={() => loadLevel(currentLevel, false)} // Don't reset cut stats on manual retry
         onOpenLevelSelect={() => setIsLevelMenuOpen(true)}
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={historyIndex > 0}
         canRedo={historyIndex < history.length - 1}
+        onCut={handleCutAction}
       />
 
       {/* LEVEL LADDER MENU */}
@@ -203,41 +263,62 @@ const App: React.FC = () => {
               <X size={24} />
             </button>
           </div>
+
+          {/* MODE TOGGLE */}
+          <div className="flex bg-slate-900 p-1 rounded-xl mb-6 border border-slate-800">
+             <button 
+               onClick={() => { setAppMode('ARENA'); setLevelIndex(0); }}
+               className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${appMode === 'ARENA' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-500 hover:text-white'}`}
+             >
+                <Swords size={18} />
+                Arena
+             </button>
+             <button 
+               onClick={() => { setAppMode('GYM'); setLevelIndex(0); }}
+               className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${appMode === 'GYM' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-white'}`}
+             >
+                <Dumbbell size={18} />
+                Gym
+             </button>
+          </div>
           
           <div className="flex-1 overflow-y-auto pr-2 space-y-3 pb-8">
-            <button 
-              onClick={() => { setIsBuilderOpen(true); setIsLevelMenuOpen(false); }}
-              className="w-full p-4 rounded-xl flex items-center justify-center gap-3 border-2 border-dashed border-slate-700 text-slate-400 hover:border-blue-500 hover:text-blue-400 hover:bg-slate-900 transition-all group"
-            >
-              <Plus size={24} />
-              <span className="font-bold">Create New Level</span>
-            </button>
+            {appMode === 'GYM' && (
+                <button 
+                  onClick={() => { setIsBuilderOpen(true); setIsLevelMenuOpen(false); }}
+                  className="w-full p-4 rounded-xl flex items-center justify-center gap-3 border-2 border-dashed border-slate-700 text-slate-400 hover:border-blue-500 hover:text-blue-400 hover:bg-slate-900 transition-all group"
+                >
+                  <Plus size={24} />
+                  <span className="font-bold">Create New Level</span>
+                </button>
+            )}
 
-            {allLevels.map((level, idx) => {
+            {activeLevels.map((level, idx) => {
               const isActive = idx === levelIndex;
-              const isCustom = idx >= LEVELS.length;
+              const isCustom = appMode === 'GYM' && idx >= GYM_LEVELS.length;
+              
               return (
                 <button
                   key={level.id}
                   onClick={() => handleLevelSelect(idx)}
                   className={`w-full p-4 rounded-xl flex items-center justify-between border-2 transition-all group ${
                     isActive 
-                      ? 'bg-blue-600/20 border-blue-500 shadow-blue-500/20 shadow-lg' 
+                      ? 'bg-slate-800 border-white/20 shadow-lg' 
                       : 'bg-slate-900 border-slate-800 hover:border-slate-600 hover:bg-slate-800'
                   }`}
                 >
                    <div className="flex items-center gap-4">
-                      <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold ${isActive ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                      <div className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold ${isActive ? (appMode === 'ARENA' ? 'bg-rose-600 text-white' : 'bg-blue-600 text-white') : 'bg-slate-800 text-slate-500'}`}>
                         {idx + 1}
                       </div>
                       <div className="text-left">
-                        <span className={`block text-xs font-bold uppercase tracking-wider ${isActive ? 'text-blue-300' : 'text-slate-500'}`}>
-                          {isCustom ? 'Custom Level' : `Level ${idx + 1}`}
+                        <span className={`block text-xs font-bold uppercase tracking-wider ${isActive ? (appMode === 'ARENA' ? 'text-rose-400' : 'text-blue-400') : 'text-slate-500'}`}>
+                          {isCustom ? 'Custom' : (appMode === 'ARENA' ? 'Challenge' : 'Practice')}
                         </span>
                         <span className={`text-lg font-bold ${isActive ? 'text-white' : 'text-slate-300'}`}>{level.name}</span>
                       </div>
                    </div>
-                   {isActive && <PlayCircle className="text-blue-400" size={24} fill="currentColor" color="white" />}
+                   {isActive && <PlayCircle className={appMode === 'ARENA' ? 'text-rose-500' : 'text-blue-500'} size={24} fill="currentColor" color="white" />}
                 </button>
               );
             })}
@@ -245,22 +326,53 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* STRUGGLE MODAL */}
+      {showStruggleModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+           <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-blue-400 max-w-sm w-full text-center">
+             <div className="w-16 h-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
+               <Dumbbell size={32} />
+             </div>
+             <h3 className="text-2xl font-bold text-white mb-2">Tough Challenge?</h3>
+             <p className="text-slate-300 mb-6">
+               This level is designed to be hard! Would you like to warm up with some simpler practice puzzles in the Gym first?
+             </p>
+             <div className="flex flex-col gap-3">
+               <button 
+                 onClick={switchToGym}
+                 className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg transition"
+               >
+                 Yes, take me to the Gym
+               </button>
+               <button 
+                 onClick={() => setShowStruggleModal(false)}
+                 className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl font-bold transition"
+               >
+                 No, I can do this
+               </button>
+             </div>
+           </div>
+        </div>
+      )}
+
       {/* WIN MODAL */}
       {showWinModal && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-green-500 max-w-sm w-full text-center transform scale-100 animate-bounce-slight">
-            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/50">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+          <div className={`bg-slate-800 p-8 rounded-2xl shadow-2xl border ${appMode === 'ARENA' ? 'border-rose-500' : 'border-green-500'} max-w-sm w-full text-center transform scale-100 animate-bounce-slight`}>
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg ${appMode === 'ARENA' ? 'bg-rose-500 shadow-rose-500/50' : 'bg-green-500 shadow-green-500/50'}`}>
+               {appMode === 'ARENA' ? <Swords className="text-white" size={32} /> : <Dumbbell className="text-white" size={32} />}
             </div>
             <h2 className="text-3xl font-bold text-white mb-2">Solved!</h2>
-            <p className="text-green-400 font-bold mb-1 uppercase tracking-widest text-xs">{currentLevel.name}</p>
-            <p className="text-slate-300 mb-6">Excellent spatial reasoning.</p>
+            <p className={`${appMode === 'ARENA' ? 'text-rose-400' : 'text-green-400'} font-bold mb-1 uppercase tracking-widest text-xs`}>{currentLevel.name}</p>
+            <p className="text-slate-300 mb-6">
+                {appMode === 'ARENA' ? 'You have conquered the arena.' : 'Good practice!'}
+            </p>
             
             <button 
               onClick={handleNextLevel}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2"
+              className={`w-full py-3 text-white rounded-xl font-bold text-lg shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2 ${appMode === 'ARENA' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-blue-600 hover:bg-blue-500'}`}
             >
-              {levelIndex < allLevels.length - 1 ? 'Next Level' : 'Finish'} 
+              {levelIndex < activeLevels.length - 1 ? 'Next Level' : 'Finish'} 
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
             </button>
           </div>
