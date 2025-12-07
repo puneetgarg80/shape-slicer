@@ -1,0 +1,5 @@
+{
+  "name": "Shape Slicer: Geometry Puzzle",
+  "description": "An interactive puzzle game where you cut, rotate, and rearrange shapes to form a perfect square. Features AI-powered hints and dynamic level generation.",
+  "requestFramePermissions": []
+}
