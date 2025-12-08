@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Piece, Cell, Coordinate, GameMode } from '../types';
-import { getAbsoluteCells, performCut, pointsToEdges, interpolatePoints, checkSolution, getEdgeAsKey, parseEdgeKey } from '../utils/geometry';
+import { getAbsoluteCells, performCut, pointsToEdges, interpolatePoints, checkSolution, checkShapeMatch, getEdgeAsKey, parseEdgeKey } from '../utils/geometry';
 import { CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, DEFAULT_TARGET_OFFSET, COLORS } from '../constants';
-import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, FlipVertical, Sparkles, RefreshCw, Undo, Redo, PenTool, Eraser, Trash2, Info, X, Target, Swords, Dumbbell, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, FlipVertical, Sparkles, RefreshCw, Undo, Redo, PenTool, Eraser, Trash2, Info, X, Target, Swords, Dumbbell, ChevronLeft, ChevronRight, Plus, Check, Circle, Footprints } from 'lucide-react';
+import UIWalkthrough, { TourStep } from './UIWalkthrough';
 
 interface GameCanvasProps {
   pieces: Piece[];
@@ -18,7 +19,10 @@ interface GameCanvasProps {
   canUndo: boolean;
   canRedo: boolean;
   onCut?: () => void;
-  // New props for UI Redesign
+  // Lifted state
+  drawnEdges: Set<string>;
+  setDrawnEdges: React.Dispatch<React.SetStateAction<Set<string>>>;
+  // UI Redesign props
   appMode: 'ARENA' | 'GYM';
   setAppMode: (mode: 'ARENA' | 'GYM') => void;
   levelIndex: number;
@@ -41,36 +45,98 @@ const getPieceCenter = (p: Piece): Coordinate => {
   };
 };
 
+const TOUR_STEPS: TourStep[] = [
+  {
+    title: "Welcome to Shape Slicer",
+    content: "Your goal is to cut and rearrange the colored pieces to match the target shape.",
+    targetId: undefined // Center
+  },
+  {
+    title: "The Target",
+    content: "This dotted outline shows the shape you need to form. You can build it anywhere on the grid!",
+    targetId: "tour-target-shape",
+    position: "top"
+  },
+  {
+    title: "Track Your Progress",
+    content: "Keep an eye on these indicators. They turn green when you meet a requirement (e.g., cutting into exactly 2 pieces).",
+    targetId: "tour-objectives",
+    position: "bottom"
+  },
+  {
+    title: "Move Mode",
+    content: "Select this tool to drag pieces around. Tap a piece to reveal options to Rotate or Flip it.",
+    targetId: "tour-mode-move",
+    position: "top"
+  },
+  {
+    title: "Pen Mode",
+    content: "Draw red lines along the grid to plan your cuts. A Scissors button will appear to confirm and slice the piece.",
+    targetId: "tour-mode-pen",
+    position: "top"
+  },
+  {
+    title: "Eraser Mode",
+    content: "Use this to remove any planned cut lines (red lines) if you change your mind.",
+    targetId: "tour-mode-eraser",
+    position: "top"
+  },
+  {
+    title: "Need Help?",
+    content: "If you get stuck, tap the Sparkles button for an AI-powered hint.",
+    targetId: "tour-hint",
+    position: "bottom"
+  }
+];
+
 const GameCanvas: React.FC<GameCanvasProps> = ({ 
   pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hint, resetLevel,
   onUndo, onRedo, canUndo, canRedo, onCut,
+  drawnEdges, setDrawnEdges,
   appMode, setAppMode, levelIndex, totalLevels, onPrevLevel, onNextLevel, isEditorMode, onCreateLevel
 }) => {
-  const [mode, setMode] = useState<GameMode>(GameMode.MOVE);
+  const [mode, setMode] = useState<GameMode>(GameMode.PEN);
   const [showRules, setShowRules] = useState(false);
+  const [showTour, setShowTour] = useState(false);
   
   // Selection & Moving
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<Coordinate | null>(null); // Pixel offset from top-left of piece
   const [dragPosition, setDragPosition] = useState<Coordinate | null>(null); // Current raw pixel position of top-left of piece
 
-  // Cutting (Drawing)
-  const [drawnEdges, setDrawnEdges] = useState<Set<string>>(new Set());
+  // Cutting (Drawing) - Local transient state
   const [lastDrawGridPos, setLastDrawGridPos] = useState<Coordinate | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   
   const svgRef = useRef<SVGSVGElement>(null);
   const finalTargetOffset = targetOffset || DEFAULT_TARGET_OFFSET;
 
-  // Reset drawing when level resets or changes
+  // Objective States
+  const hasTwoPieces = pieces.length === 2;
+  const hasMinCells = pieces.length > 0 && pieces.every(p => p.cells.length >= 3);
+  const matchesTarget = checkShapeMatch(pieces, targetCells);
+
+  // Check for first-time user and auto-start tour
   useEffect(() => {
-    setDrawnEdges(new Set());
-  }, [pieces.length === 1 && pieces[0].id === 'root-piece']); // Rough heuristic for reset, or pass explicit prop
+    const hasSeenTour = localStorage.getItem('hasSeenWalkthrough');
+    if (!hasSeenTour) {
+      // Delay slightly to ensure UI is ready
+      const timer = setTimeout(() => {
+        setShowTour(true);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const handleCloseTour = () => {
+    setShowTour(false);
+    localStorage.setItem('hasSeenWalkthrough', 'true');
+  };
 
   // Reset local state on external reset
   const handleResetLevel = () => {
-    setDrawnEdges(new Set());
-    setMode(GameMode.MOVE);
+    // drawnEdges cleared by parent via resetLevel -> loadLevel
+    setMode(GameMode.PEN);
     resetLevel();
   };
 
@@ -227,7 +293,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       newPiecesList = [...newPiecesList, ...piecesToAdd];
       setPieces(newPiecesList);
       setMode(GameMode.MOVE);
-      if (piecesToAdd.length > 0) setSelectedPieceId(piecesToAdd[0].id);
+      if (piecesToAdd.length > 0) setSelectedPieceId(piecesToAdd[piecesToAdd.length - 1].id);
       
       // Notify parent about the cut
       if (onCut) onCut();
@@ -336,7 +402,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     });
   };
 
+  const startTour = () => {
+    setShowRules(false);
+    setShowTour(true);
+  };
+
   return (
+    <>
+    <UIWalkthrough 
+      isOpen={showTour} 
+      onClose={handleCloseTour} 
+      steps={TOUR_STEPS} 
+    />
+    
     <div className="flex flex-col h-full w-full max-w-md mx-auto relative bg-puzzle-bg overflow-hidden touch-none select-none">
       
       {/* --- HEADER --- */}
@@ -346,7 +424,24 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
             <h1 className="text-xl font-bold text-white tracking-tight">Shape Slicer</h1>
             <div className="text-xs text-slate-400">Match the target shape</div>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 items-center">
+              
+              {/* OBJECTIVES MINI-WIDGET */}
+              <div id="tour-objectives" className="flex flex-col items-end mr-2 space-y-[2px]">
+                  <div className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider transition-colors duration-300 ${hasTwoPieces ? 'text-green-400' : 'text-slate-500'}`}>
+                      <span>2 Pieces</span>
+                      {hasTwoPieces ? <Check size={10} strokeWidth={3} /> : <Circle size={10} strokeWidth={2} />}
+                  </div>
+                  <div className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider transition-colors duration-300 ${hasMinCells ? 'text-green-400' : 'text-slate-500'}`}>
+                      <span>3+ Cells</span>
+                      {hasMinCells ? <Check size={10} strokeWidth={3} /> : <Circle size={10} strokeWidth={2} />}
+                  </div>
+                  <div className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider transition-colors duration-300 ${matchesTarget ? 'text-green-400' : 'text-slate-500'}`}>
+                      <span>Target</span>
+                      {matchesTarget ? <Check size={10} strokeWidth={3} /> : <Circle size={10} strokeWidth={2} />}
+                  </div>
+              </div>
+
               <button 
                 onClick={() => setShowRules(true)}
                 className="p-2 rounded-full text-slate-400 hover:bg-slate-800 hover:text-white transition"
@@ -375,6 +470,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                 <RefreshCw size={18} />
               </button>
               <button 
+                id="tour-hint"
                 onClick={onRequestHint} 
                 disabled={!!hint}
                 className={`p-2 rounded-full transition active:scale-95 ${hint ? 'bg-purple-900 text-purple-300' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}
@@ -389,13 +485,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
            <div className="flex bg-slate-800 p-1 rounded-lg">
              <button 
                onClick={() => setAppMode('ARENA')}
-               className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${appMode === 'ARENA' ? 'bg-rose-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+               className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${appMode === 'ARENA' ? 'bg-slate-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
              >
                 <Swords size={14} /> Arena
              </button>
              <button 
                onClick={() => setAppMode('GYM')}
-               className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${appMode === 'GYM' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+               className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${appMode === 'GYM' ? 'bg-slate-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
              >
                 <Dumbbell size={14} /> Gym
              </button>
@@ -432,36 +528,58 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
       {/* --- HINT --- */}
       {hint && (
-        <div className="absolute top-28 left-4 right-4 z-20 bg-purple-900/90 text-purple-100 p-3 rounded-lg text-sm border border-purple-500 shadow-xl animate-bounce-slight">
+        <div className="absolute top-32 left-4 right-4 z-20 bg-purple-900/90 text-purple-100 p-3 rounded-lg text-sm border border-purple-500 shadow-xl animate-bounce-slight">
           <strong>AI Hint:</strong> {hint}
         </div>
       )}
 
       {/* --- FLOATING ACTION BUTTONS --- */}
-      {drawnEdges.size > 0 && (
-         <div className="absolute top-32 right-4 z-30 flex flex-col gap-2 animate-fade-in">
+      <div className="absolute top-32 right-4 z-30 flex flex-col gap-2 pointer-events-none">
+        
+        {/* Cut Actions */}
+        {drawnEdges.size > 0 && (
+           <div className="flex flex-col gap-2 animate-fade-in">
              <button 
                 onClick={executeCut}
-                className="w-12 h-12 rounded-full bg-rose-600 hover:bg-rose-500 text-white shadow-lg flex items-center justify-center animate-bounce-slight"
+                className="w-12 h-12 rounded-full bg-rose-600 hover:bg-rose-500 text-white shadow-lg flex items-center justify-center animate-bounce-slight pointer-events-auto transition-transform active:scale-95"
                 title="Execute Cut"
               >
                 <Scissors size={24} />
              </button>
              <button 
                 onClick={clearDrawing}
-                className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white shadow-md flex items-center justify-center"
+                className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white shadow-md flex items-center justify-center pointer-events-auto transition-transform active:scale-95"
                 title="Clear Drawing"
               >
                 <Trash2 size={20} />
              </button>
-         </div>
-      )}
+           </div>
+        )}
+
+        {/* Move Actions */}
+        {mode === GameMode.MOVE && selectedPieceId && (
+          <div className="flex flex-col gap-2 animate-fade-in">
+             <button onClick={() => handleRotate(-1)} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white shadow-md flex items-center justify-center pointer-events-auto transition-transform active:scale-95" title="Rotate Left">
+               <RotateCcw size={20} />
+             </button>
+             <button onClick={() => handleFlipHorizontal()} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white shadow-md flex items-center justify-center pointer-events-auto transition-transform active:scale-95" title="Flip Horizontal">
+               <FlipHorizontal size={20} />
+             </button>
+             <button onClick={() => handleFlipVertical()} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white shadow-md flex items-center justify-center pointer-events-auto transition-transform active:scale-95" title="Flip Vertical">
+               <FlipVertical size={20} />
+             </button>
+             <button onClick={() => handleRotate(1)} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white shadow-md flex items-center justify-center pointer-events-auto transition-transform active:scale-95" title="Rotate Right">
+               <RotateCw size={20} />
+             </button>
+          </div>
+        )}
+      </div>
 
       {/* --- CANVAS --- */}
-      <div className="flex-1 overflow-hidden relative flex items-center justify-center">
+      <div id="tour-canvas" className="flex-1 overflow-hidden relative flex items-center justify-center">
         <svg 
           ref={svgRef}
-          className={`w-full h-full bg-puzzle-bg ${mode === GameMode.MOVE ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
+          className={`w-full h-full bg-slate-900 ${mode === GameMode.MOVE ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
           viewBox={`0 0 ${GRID_WIDTH * CELL_SIZE} ${GRID_HEIGHT * CELL_SIZE}`}
           preserveAspectRatio="xMidYMid meet"
           onPointerDown={handlePointerDown}
@@ -483,7 +601,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           <rect width="100%" height="100%" fill="url(#dots)" />
 
           {/* Target Ghost */}
-          <g transform={`translate(${finalTargetOffset.x * CELL_SIZE}, ${finalTargetOffset.y * CELL_SIZE})`}>
+          <g id="tour-target-shape" transform={`translate(${finalTargetOffset.x * CELL_SIZE}, ${finalTargetOffset.y * CELL_SIZE})`}>
              {targetCells.map((c, i) => (
                <rect 
                  key={`t-${i}`} 
@@ -578,64 +696,29 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         <div className="flex flex-col gap-4">
           
           {/* Mode Selector */}
-          <div className="flex bg-slate-800 p-1 rounded-xl self-center shadow-lg w-full max-w-xs justify-between">
+          <div id="tour-modes" className="flex bg-slate-800 p-1 rounded-xl self-center shadow-lg w-full max-w-xs justify-between">
               <button 
+                id="tour-mode-move"
                 onClick={() => setMode(GameMode.MOVE)}
-                className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${mode === GameMode.MOVE ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${mode === GameMode.MOVE ? 'bg-slate-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
               >
                 <Move size={18} /> Move
               </button>
               <button 
+                id="tour-mode-pen"
                 onClick={() => setMode(GameMode.PEN)}
-                className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${mode === GameMode.PEN ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${mode === GameMode.PEN ? 'bg-slate-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
               >
                 <PenTool size={18} /> Pen
               </button>
               <button 
+                id="tour-mode-eraser"
                 onClick={() => setMode(GameMode.ERASER)}
                 className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${mode === GameMode.ERASER ? 'bg-slate-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
               >
                 <Eraser size={18} /> Eraser
               </button>
           </div>
-
-          {/* Manipulation Controls (Only visible in Move Mode) */}
-          <div className={`flex justify-between items-center px-4 transition-all duration-300 ${mode === GameMode.MOVE && selectedPieceId ? 'opacity-100 translate-y-0 h-16' : 'opacity-0 translate-y-4 h-0 pointer-events-none'}`}>
-             <button onClick={() => handleRotate(-1)} className="flex flex-col items-center gap-1 text-slate-300 active:text-white active:scale-95 transition">
-               <div className="p-3 bg-slate-800 rounded-full border border-slate-600 shadow-sm">
-                 <RotateCcw size={20} />
-               </div>
-               <span className="text-[10px] font-bold tracking-wider">LEFT</span>
-             </button>
-
-             <button onClick={() => handleFlipHorizontal()} className="flex flex-col items-center gap-1 text-slate-300 active:text-white active:scale-95 transition">
-               <div className="p-3 bg-slate-800 rounded-full border border-slate-600 shadow-sm">
-                 <FlipHorizontal size={20} />
-               </div>
-               <span className="text-[10px] font-bold tracking-wider">H.FLIP</span>
-             </button>
-
-             <button onClick={() => handleFlipVertical()} className="flex flex-col items-center gap-1 text-slate-300 active:text-white active:scale-95 transition">
-               <div className="p-3 bg-slate-800 rounded-full border border-slate-600 shadow-sm">
-                 <FlipVertical size={20} />
-               </div>
-               <span className="text-[10px] font-bold tracking-wider">V.FLIP</span>
-             </button>
-
-             <button onClick={() => handleRotate(1)} className="flex flex-col items-center gap-1 text-slate-300 active:text-white active:scale-95 transition">
-               <div className="p-3 bg-slate-800 rounded-full border border-slate-600 shadow-sm">
-                 <RotateCw size={20} />
-               </div>
-               <span className="text-[10px] font-bold tracking-wider">RIGHT</span>
-             </button>
-          </div>
-          
-          {/* Helper Text for Pen Mode */}
-          {(mode === GameMode.PEN || mode === GameMode.ERASER) && (
-              <div className="text-center text-xs text-slate-400 h-16 flex items-center justify-center animate-fade-in">
-                  {mode === GameMode.PEN ? 'Draw lines on grid boundaries' : 'Drag over red lines to remove them'}
-              </div>
-          )}
         </div>
       </div>
 
@@ -663,13 +746,22 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                         <div><strong className="text-white block">Goal</strong> Form the target shape anywhere on the grid.</div>
                     </li>
                 </ul>
-                <div className="mt-6 pt-4 border-t border-slate-700 text-center">
-                    <button onClick={() => setShowRules(false)} className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full font-bold text-sm transition">Got it</button>
+                <div className="mt-6 pt-4 border-t border-slate-700 flex flex-col gap-2">
+                    <button 
+                      onClick={startTour}
+                      className="w-full px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"
+                    >
+                      <Footprints size={16} /> Start Interactive Tour
+                    </button>
+                    <button onClick={() => setShowRules(false)} className="w-full px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold text-sm transition">
+                      Got it
+                    </button>
                 </div>
             </div>
         </div>
       )}
     </div>
+    </>
   );
 };
 

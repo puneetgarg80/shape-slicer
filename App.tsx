@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import GameCanvas from './components/GameCanvas';
 import LevelBuilder from './components/LevelBuilder';
 import { Piece, LevelData } from './types';
@@ -8,6 +8,17 @@ import { getGeminiHint } from './services/geminiService';
 import { PlayCircle, Plus, Dumbbell, Swords } from 'lucide-react';
 
 type AppMode = 'ARENA' | 'GYM';
+
+interface GameplayState {
+  levelIndex: number;
+  pieces: Piece[];
+  history: Piece[][];
+  historyIndex: number;
+  cutCount: number;
+  drawnEdges: Set<string>;
+  hint: string | null;
+  hasShownStrugglePrompt: boolean;
+}
 
 const App: React.FC = () => {
   const [appMode, setAppMode] = useState<AppMode>('ARENA');
@@ -28,6 +39,7 @@ const App: React.FC = () => {
 
   // Game State
   const [pieces, setPieces] = useState<Piece[]>([]);
+  const [drawnEdges, setDrawnEdges] = useState<Set<string>>(new Set());
   
   // History State
   const [history, setHistory] = useState<Piece[][]>([]);
@@ -43,27 +55,70 @@ const App: React.FC = () => {
   const [isGameComplete, setIsGameComplete] = useState(false);
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
 
-  // Initialize Level
-  useEffect(() => {
-    if (currentLevel) {
-      loadLevel(currentLevel, true);
-    }
-  }, [currentLevel, appMode]);
+  // Persistence Store
+  const gameStateStore = useRef<{ [key in AppMode]?: GameplayState }>({});
 
-  const loadLevel = (level: LevelData, resetStats: boolean = true) => {
+  // Initialize Game on Mount
+  useEffect(() => {
+    loadLevel(arenaLevels[0], 0, true);
+  }, []);
+
+  const saveCurrentState = () => {
+     gameStateStore.current[appMode] = {
+        levelIndex,
+        pieces,
+        history,
+        historyIndex,
+        cutCount,
+        drawnEdges,
+        hint,
+        hasShownStrugglePrompt,
+     };
+  };
+
+  const handleSwitchMode = (targetMode: AppMode) => {
+    if (targetMode === appMode) return;
+    
+    // 1. Save current state
+    saveCurrentState();
+    
+    // 2. Switch mode variable
+    setAppMode(targetMode);
+    
+    // 3. Restore or Init new state
+    const saved = gameStateStore.current[targetMode];
+    if (saved) {
+       setLevelIndex(saved.levelIndex);
+       setPieces(saved.pieces);
+       setHistory(saved.history);
+       setHistoryIndex(saved.historyIndex);
+       setCutCount(saved.cutCount);
+       setDrawnEdges(saved.drawnEdges);
+       setHint(saved.hint);
+       setHasShownStrugglePrompt(saved.hasShownStrugglePrompt);
+       
+       setShowStruggleModal(false);
+       setShowWinModal(false);
+    } else {
+       // Init default for this mode
+       const levels = targetMode === 'ARENA' ? arenaLevels : gymLevels; // Note: gymLevels needs to capture latest closure
+       setLevelIndex(0);
+       loadLevel(levels[0], 0, true);
+    }
+  };
+
+  const loadLevel = (level: LevelData, levelIdx: number, resetStats: boolean = true) => {
     const { normalized } = normalizePiece(level.initialShape);
     
-    // Use the level's defined start offset if it exists (for custom levels), otherwise use default
     const startPos = level.startOffset || START_OFFSET;
 
-    // Create initial piece
     const initialPiece: Piece = {
       id: 'root-piece',
       cells: normalized,
       position: startPos,
       rotation: 0,
       isFlipped: false,
-      color: COLORS[(levelIndex + (appMode === 'GYM' ? 1 : 0)) % COLORS.length],
+      color: COLORS[(levelIdx + (appMode === 'GYM' ? 1 : 0)) % COLORS.length],
     };
 
     const initialPieces = [initialPiece];
@@ -72,8 +127,8 @@ const App: React.FC = () => {
     setHistoryIndex(0);
     setHint(null);
     setShowWinModal(false);
+    setDrawnEdges(new Set()); // Clear drawings on level load
     
-    // Reset struggle state only if requested (i.e., new level, not just a retry)
     if (resetStats) {
       setCutCount(0);
       setHasShownStrugglePrompt(false);
@@ -85,8 +140,6 @@ const App: React.FC = () => {
     const newCount = cutCount + 1;
     setCutCount(newCount);
 
-    // Check for struggle in Arena mode
-    // If cuts > 5 and we haven't bugged them yet
     if (appMode === 'ARENA' && newCount > 5 && !hasShownStrugglePrompt) {
         setShowStruggleModal(true);
         setHasShownStrugglePrompt(true);
@@ -95,25 +148,19 @@ const App: React.FC = () => {
 
   const switchToGym = () => {
     setShowStruggleModal(false);
-    setAppMode('GYM');
-    setLevelIndex(0); // Start from first gym level
+    handleSwitchMode('GYM');
   };
 
-  // Custom setter to manage history
   const handleSetPieces: React.Dispatch<React.SetStateAction<Piece[]>> = (action) => {
     let newPieces: Piece[];
-    
-    // Resolve the new state
     if (typeof action === 'function') {
       newPieces = action(pieces);
     } else {
       newPieces = action;
     }
 
-    // If nothing changed effectively (reference check), do nothing
     if (newPieces === pieces) return;
 
-    // Slice history to current point (removes future if we are in past)
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(newPieces);
 
@@ -146,7 +193,9 @@ const App: React.FC = () => {
 
   const handleNextLevel = () => {
     if (levelIndex < activeLevels.length - 1) {
-      setLevelIndex(prev => prev + 1);
+      const newIndex = levelIndex + 1;
+      setLevelIndex(newIndex);
+      loadLevel(activeLevels[newIndex], newIndex, true);
     } else {
       setIsGameComplete(true);
     }
@@ -155,7 +204,9 @@ const App: React.FC = () => {
   
   const handlePrevLevel = () => {
     if (levelIndex > 0) {
-      setLevelIndex(prev => prev - 1);
+      const newIndex = levelIndex - 1;
+      setLevelIndex(newIndex);
+      loadLevel(activeLevels[newIndex], newIndex, true);
     }
   };
 
@@ -163,23 +214,35 @@ const App: React.FC = () => {
     setLevelIndex(0);
     setIsGameComplete(false);
     setShowWinModal(false);
+    loadLevel(activeLevels[0], 0, true);
   };
 
   const handleRequestHint = async () => {
     setHint("Thinking...");
     const hintText = await getGeminiHint(pieces, currentLevel.targetCells);
     setHint(hintText);
-    
     setTimeout(() => setHint(null), 10000);
   };
 
   const handleSaveCustomLevel = (newLevel: LevelData) => {
-    setCustomLevels(prev => [...prev, newLevel]);
+    const updatedCustomLevels = [...customLevels, newLevel];
+    setCustomLevels(updatedCustomLevels);
     setIsBuilderOpen(false);
-    // Switch to GYM mode where custom levels live
+    
+    // If we are currently in ARENA, save its state
+    if (appMode === 'ARENA') {
+      saveCurrentState();
+    }
+    
+    // Switch to GYM and load the new level
     setAppMode('GYM');
-    // Set index to the newly created level (end of GYM list)
-    setLevelIndex(GYM_LEVELS.length + customLevels.length); 
+    // Calculate new index (total gym levels - 1, since we just added one)
+    const newIndex = GYM_LEVELS.length + updatedCustomLevels.length - 1;
+    setLevelIndex(newIndex);
+    
+    // Note: We need to use the full list including the new one
+    const allGymLevels = [...GYM_LEVELS, ...updatedCustomLevels];
+    loadLevel(allGymLevels[newIndex], newIndex, true);
   };
 
   if (isBuilderOpen) {
@@ -217,7 +280,11 @@ const App: React.FC = () => {
                     </button>
                     {appMode === 'GYM' && (
                         <button 
-                            onClick={() => { setAppMode('ARENA'); setLevelIndex(0); setIsGameComplete(false); }}
+                            onClick={() => { 
+                              // Reset Game Complete state, then switch
+                              setIsGameComplete(false);
+                              handleSwitchMode('ARENA');
+                            }}
                             className="w-full py-4 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold text-lg shadow-lg transition transform active:scale-95"
                         >
                             Return to Arena
@@ -239,16 +306,20 @@ const App: React.FC = () => {
         onWin={handleWin}
         onRequestHint={handleRequestHint}
         hint={hint}
-        resetLevel={() => loadLevel(currentLevel, false)} // Don't reset cut stats on manual retry
+        resetLevel={() => loadLevel(currentLevel, levelIndex, false)}
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={historyIndex > 0}
         canRedo={historyIndex < history.length - 1}
         onCut={handleCutAction}
         
+        // Lifted State
+        drawnEdges={drawnEdges}
+        setDrawnEdges={setDrawnEdges}
+        
         // Navigation Props
         appMode={appMode}
-        setAppMode={setAppMode}
+        setAppMode={handleSwitchMode}
         levelIndex={levelIndex}
         totalLevels={activeLevels.length}
         onPrevLevel={handlePrevLevel}

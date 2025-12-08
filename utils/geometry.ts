@@ -46,12 +46,8 @@ export const normalizePiece = (cells: Cell[]): { normalized: Cell[], offset: Coo
   };
 };
 
-// Check if pieces match the target shape exactly (position independent)
-export const checkSolution = (pieces: Piece[], targetCells: Cell[]): boolean => {
-  // Enforce puzzle constraints: Exactly 2 pieces, minimum 3 cells each
-  if (pieces.length !== 2) return false;
-  if (pieces.some(p => p.cells.length < 3)) return false;
-
+// Check if the union of pieces matches the target shape (ignoring piece count/size constraints)
+export const checkShapeMatch = (pieces: Piece[], targetCells: Cell[]): boolean => {
   const allAbsCells = pieces.flatMap(getAbsoluteCells);
   if (allAbsCells.length === 0) return false;
 
@@ -73,6 +69,15 @@ export const checkSolution = (pieces: Piece[], targetCells: Cell[]): boolean => 
   }
 
   return true;
+};
+
+// Check if pieces match the target shape exactly (position independent) and meet all constraints
+export const checkSolution = (pieces: Piece[], targetCells: Cell[]): boolean => {
+  // Enforce puzzle constraints: Exactly 2 pieces, minimum 3 cells each
+  if (pieces.length !== 2) return false;
+  if (pieces.some(p => p.cells.length < 3)) return false;
+
+  return checkShapeMatch(pieces, targetCells);
 };
 
 // Convert a continuous path of grid intersections to Cut Edges

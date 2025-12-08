@@ -4,15 +4,18 @@ import { getAbsoluteCells } from '../utils/geometry';
 
 // Initialize Gemini Client
 // IMPORTANT: Access API key from process.env.API_KEY securely
-// We wrap this in a try-catch and check typeof to avoid ReferenceError in purely browser environments
 let apiKey = '';
 try {
+  // Check specifically for the process global to avoid ReferenceErrors in strict browser environments
   if (typeof process !== 'undefined' && process.env) {
     apiKey = process.env.API_KEY || '';
   }
 } catch (e) {
-  console.warn('Unable to access process.env');
+  // process is not available, ignore
 }
+
+// Clean the key
+apiKey = apiKey.trim();
 
 let ai: GoogleGenAI | null = null;
 
@@ -31,10 +34,6 @@ export const getGeminiHint = async (
   if (!ai) return "Gemini API Key is missing. Cannot generate hint.";
 
   // Construct a text representation of the current board state
-  // We will represent the grid as a string map.
-  
-  // 1. Build ASCII Map
-  // Finding bounds
   const allCells = pieces.flatMap(getAbsoluteCells);
   if (allCells.length === 0) return "No pieces on board.";
 
@@ -78,7 +77,14 @@ export const getGeminiHint = async (
       contents: prompt,
     });
     return response.text?.trim() || "The hint is unclear.";
-  } catch (error) {
+  } catch (error: any) {
+    // Handle 403 Permission Denied specifically to avoid alarming console errors
+    // and provide better feedback to the user
+    if (error.status === 403 || (error.message && error.message.includes('403'))) {
+        console.warn("Gemini API Permission Denied. Please check API Key permissions.");
+        return "Hint unavailable: Permission Denied.";
+    }
+    
     console.error("Gemini Error:", error);
     return "The stars are silent. Try moving pieces closer.";
   }
