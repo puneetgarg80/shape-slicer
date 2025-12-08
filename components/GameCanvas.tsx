@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Piece, Cell, Coordinate, GameMode, ActionType } from '../types';
 import { getAbsoluteCells, performCut, pointsToEdges, interpolatePoints, checkSolution, checkShapeMatch, getEdgeAsKey, parseEdgeKey } from '../utils/geometry';
 import { CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, DEFAULT_TARGET_OFFSET, COLORS } from '../constants';
-import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, FlipVertical, Sparkles, RefreshCw, Undo, Redo, PenTool, Eraser, Trash2, Info, X, Target, Swords, Dumbbell, ChevronLeft, ChevronRight, Plus, Check, Circle, Footprints } from 'lucide-react';
+import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, FlipVertical, Sparkles, RefreshCw, Undo, Redo, PenTool, Eraser, Trash2, Info, X, Target, ChevronLeft, ChevronRight, Plus, Check, Circle, Footprints } from 'lucide-react';
 import UIWalkthrough, { TourStep } from './UIWalkthrough';
 
 interface GameCanvasProps {
@@ -22,9 +22,7 @@ interface GameCanvasProps {
   // Lifted state
   drawnEdges: Set<string>;
   setDrawnEdges: React.Dispatch<React.SetStateAction<Set<string>>>;
-  // UI Redesign props
-  appMode: 'ARENA' | 'GYM';
-  setAppMode: (mode: 'ARENA' | 'GYM') => void;
+  // Navigation
   levelIndex: number;
   totalLevels: number;
   onPrevLevel: () => void;
@@ -115,7 +113,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hint, resetLevel,
   onUndo, onRedo, canUndo, canRedo, onCut,
   drawnEdges, setDrawnEdges,
-  appMode, setAppMode, levelIndex, totalLevels, onPrevLevel, onNextLevel, isEditorMode, onCreateLevel,
+  levelIndex, totalLevels, onPrevLevel, onNextLevel, isEditorMode, onCreateLevel,
   onLogAction
 }) => {
   const [mode, setMode] = useState<GameMode>(GameMode.PEN);
@@ -466,44 +464,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
             <h1 className="text-lg font-extrabold text-white tracking-tight font-sans">Shape Slicer</h1>
             
             <div className="flex items-center gap-2">
-                <div className="flex bg-slate-800 p-0.5 rounded-lg">
-                  <button 
-                    onClick={() => setAppMode('ARENA')}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] sm:text-xs font-bold transition-all ${appMode === 'ARENA' ? 'bg-slate-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    <Swords size={12} /> Arena
-                  </button>
-                  <button 
-                    onClick={() => setAppMode('GYM')}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] sm:text-xs font-bold transition-all ${appMode === 'GYM' ? 'bg-slate-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    <Dumbbell size={12} /> Gym
-                  </button>
-                </div>
-
                 {/* Level Nav */}
-                {(appMode === 'GYM' || isEditorMode) && (
-                  <div className="flex items-center bg-slate-800 rounded-lg p-0.5">
-                    {appMode === 'GYM' && (
-                        <>
-                            <button onClick={onPrevLevel} disabled={levelIndex === 0} className="p-1 rounded hover:bg-slate-700 disabled:opacity-30 text-slate-300">
-                                <ChevronLeft size={14} />
-                            </button>
-                            <span className="text-[10px] font-bold px-1 text-slate-300 min-w-[2rem] text-center">
-                                {levelIndex + 1}/{totalLevels}
-                            </span>
-                            <button onClick={onNextLevel} disabled={levelIndex === totalLevels - 1} className="p-1 rounded hover:bg-slate-700 disabled:opacity-30 text-slate-300">
-                                <ChevronRight size={14} />
-                            </button>
-                        </>
-                    )}
+                <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700">
+                    <button onClick={onPrevLevel} disabled={levelIndex === 0} className="p-1 rounded hover:bg-slate-700 disabled:opacity-30 text-slate-300">
+                        <ChevronLeft size={16} />
+                    </button>
+                    <span className="text-xs font-bold px-2 text-slate-300 min-w-[3rem] text-center">
+                        {levelIndex + 1} / {totalLevels}
+                    </span>
+                    <button onClick={onNextLevel} disabled={levelIndex === totalLevels - 1} className="p-1 rounded hover:bg-slate-700 disabled:opacity-30 text-slate-300">
+                        <ChevronRight size={16} />
+                    </button>
                     {isEditorMode && (
-                        <button onClick={onCreateLevel} className="p-1 ml-1 rounded hover:bg-slate-700 text-slate-300" title="Create">
-                            <Plus size={14} />
+                        <button onClick={onCreateLevel} className="p-1 ml-1 rounded hover:bg-slate-700 text-slate-300 border-l border-slate-700" title="Create">
+                            <Plus size={16} />
                         </button>
                     )}
-                  </div>
-                )}
+                </div>
             </div>
         </div>
 

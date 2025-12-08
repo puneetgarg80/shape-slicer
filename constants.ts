@@ -4,7 +4,7 @@ export const CELL_SIZE = 42; // Increased from 36 to 42 for better visibility
 export const GRID_WIDTH = 12; // Narrower for portrait
 export const GRID_HEIGHT = 24; // Taller for vertical stacking
 export const DEFAULT_TARGET_OFFSET = { x: 4, y: 15 };
-export const START_OFFSET = { x: 2, y: 1 }; 
+export const START_OFFSET = { x: 2, y: 0 }; 
 
 // Helper to generate rectangles
 const rect = (w: number, h: number) => {
@@ -14,7 +14,7 @@ const rect = (w: number, h: number) => {
   }));
 };
 
-export const ARENA_LEVELS: LevelData[] = [
+const ARENA_LEVELS: LevelData[] = [
   {
     id: 'main-challenge',
     name: 'ZigZag Challenge',
@@ -33,7 +33,7 @@ export const ARENA_LEVELS: LevelData[] = [
   }
 ];
 
-export const GYM_LEVELS: LevelData[] = [
+const GYM_LEVELS: LevelData[] = [
   {
     id: 'practice-level-1',
     name: 'Gym: Basics I',
@@ -82,8 +82,8 @@ export const GYM_LEVELS: LevelData[] = [
   }
 ];
 
-// Combine for backward compatibility if needed, though App.tsx handles separation
-export const LEVELS = [...ARENA_LEVELS, ...GYM_LEVELS];
+// Combine Gym first, then Arena
+export const LEVELS = [...GYM_LEVELS, ...ARENA_LEVELS];
 
 // Colors
 export const COLORS = [
