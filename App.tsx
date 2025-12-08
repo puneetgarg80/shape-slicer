@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import GameCanvas from './components/GameCanvas';
 import LevelBuilder from './components/LevelBuilder';
-import { Piece, LevelData } from './types';
+import NameModal from './components/NameModal';
+import { Piece, LevelData, ActionLogEntry, ActionType, UserSessionPayload } from './types';
 import { ARENA_LEVELS, GYM_LEVELS, COLORS, START_OFFSET } from './constants';
 import { normalizePiece } from './utils/geometry';
 import { getGeminiHint } from './services/geminiService';
@@ -21,6 +22,11 @@ interface GameplayState {
 }
 
 const App: React.FC = () => {
+  // User Session State
+  const [userName, setUserName] = useState<string | null>(null);
+  const sessionId = useRef(`sess-${Date.now()}`);
+  const actionLog = useRef<ActionLogEntry[]>([]);
+
   const [appMode, setAppMode] = useState<AppMode>('ARENA');
   const [customLevels, setCustomLevels] = useState<LevelData[]>([]);
   const [levelIndex, setLevelIndex] = useState(0);
@@ -58,10 +64,58 @@ const App: React.FC = () => {
   // Persistence Store
   const gameStateStore = useRef<{ [key in AppMode]?: GameplayState }>({});
 
+  // --- LOGGING SYSTEM ---
+
+  const logAction = (type: ActionType, details?: any) => {
+    const entry: ActionLogEntry = {
+      timestamp: Date.now(),
+      type,
+      details
+    };
+    actionLog.current.push(entry);
+    // console.log("Action Logged:", entry); // Debug
+  };
+
+  // Sync to "Server" Interval
+  useEffect(() => {
+    if (!userName) return;
+
+    const intervalId = setInterval(() => {
+      if (actionLog.current.length > 0) {
+        const payload: UserSessionPayload = {
+          userName,
+          sessionId: sessionId.current,
+          actions: [...actionLog.current]
+        };
+
+        // MOCK SERVER SEND
+        console.info(`[SERVER SYNC] Sending ${payload.actions.length} actions for user ${userName}...`);
+        console.log("Payload:", JSON.stringify(payload));
+        
+        // Clear log after "send"
+        actionLog.current = [];
+      }
+    }, 5000); // Send every 5 seconds
+
+    return () => clearInterval(intervalId);
+  }, [userName]);
+
+  // --- GAME LOGIC ---
+
   // Initialize Game on Mount
   useEffect(() => {
-    loadLevel(arenaLevels[0], 0, true);
+    // Check localStorage for existing name to skip modal if desired, 
+    // but prompt asked to "Ask user for name", so we'll default to modal interaction
+    // loadLevel(arenaLevels[0], 0, true); 
+    // Defer loading level until name is set to avoid background actions
   }, []);
+
+  // When name is set, start the game
+  const handleNameSubmit = (name: string) => {
+    setUserName(name);
+    logAction('GAME_START', { userName: name });
+    loadLevel(arenaLevels[0], 0, true);
+  };
 
   const saveCurrentState = () => {
      gameStateStore.current[appMode] = {
@@ -79,6 +133,8 @@ const App: React.FC = () => {
   const handleSwitchMode = (targetMode: AppMode) => {
     if (targetMode === appMode) return;
     
+    logAction('MODE_CHANGE', { from: appMode, to: targetMode });
+
     // 1. Save current state
     saveCurrentState();
     
@@ -99,9 +155,11 @@ const App: React.FC = () => {
        
        setShowStruggleModal(false);
        setShowWinModal(false);
+       logAction('LEVEL_LOAD', { levelId: activeLevels[saved.levelIndex]?.id, restored: true });
+
     } else {
        // Init default for this mode
-       const levels = targetMode === 'ARENA' ? arenaLevels : gymLevels; // Note: gymLevels needs to capture latest closure
+       const levels = targetMode === 'ARENA' ? arenaLevels : gymLevels; 
        setLevelIndex(0);
        loadLevel(levels[0], 0, true);
     }
@@ -120,6 +178,8 @@ const App: React.FC = () => {
       isFlipped: false,
       color: COLORS[(levelIdx + (appMode === 'GYM' ? 1 : 0)) % COLORS.length],
     };
+
+    logAction('LEVEL_LOAD', { levelId: level.id, levelName: level.name });
 
     const initialPieces = [initialPiece];
     setPieces(initialPieces);
@@ -171,6 +231,7 @@ const App: React.FC = () => {
 
   const handleUndo = () => {
     if (historyIndex > 0) {
+      logAction('UNDO', { fromIndex: historyIndex, toIndex: historyIndex - 1 });
       const newIndex = historyIndex - 1;
       setHistoryIndex(newIndex);
       setPieces(history[newIndex]);
@@ -179,6 +240,7 @@ const App: React.FC = () => {
 
   const handleRedo = () => {
     if (historyIndex < history.length - 1) {
+      logAction('REDO', { fromIndex: historyIndex, toIndex: historyIndex + 1 });
       const newIndex = historyIndex + 1;
       setHistoryIndex(newIndex);
       setPieces(history[newIndex]);
@@ -187,6 +249,7 @@ const App: React.FC = () => {
 
   const handleWin = () => {
     if (!showWinModal) {
+      logAction('WIN', { levelId: currentLevel.id, cuts: cutCount });
       setShowWinModal(true);
     }
   };
@@ -211,6 +274,7 @@ const App: React.FC = () => {
   };
 
   const handleRestartGame = () => {
+    logAction('RESET_LEVEL', { type: 'full_game_restart' });
     setLevelIndex(0);
     setIsGameComplete(false);
     setShowWinModal(false);
@@ -218,6 +282,7 @@ const App: React.FC = () => {
   };
 
   const handleRequestHint = async () => {
+    logAction('GET_HINT', { levelId: currentLevel.id });
     setHint("Thinking...");
     const hintText = await getGeminiHint(pieces, currentLevel.targetCells);
     setHint(hintText);
@@ -244,6 +309,10 @@ const App: React.FC = () => {
     const allGymLevels = [...GYM_LEVELS, ...updatedCustomLevels];
     loadLevel(allGymLevels[newIndex], newIndex, true);
   };
+
+  if (!userName) {
+    return <NameModal onSubmit={handleNameSubmit} />;
+  }
 
   if (isBuilderOpen) {
     return (
@@ -306,12 +375,16 @@ const App: React.FC = () => {
         onWin={handleWin}
         onRequestHint={handleRequestHint}
         hint={hint}
-        resetLevel={() => loadLevel(currentLevel, levelIndex, false)}
+        resetLevel={() => {
+          logAction('RESET_LEVEL', { levelId: currentLevel.id });
+          loadLevel(currentLevel, levelIndex, false);
+        }}
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={historyIndex > 0}
         canRedo={historyIndex < history.length - 1}
         onCut={handleCutAction}
+        onLogAction={logAction}
         
         // Lifted State
         drawnEdges={drawnEdges}

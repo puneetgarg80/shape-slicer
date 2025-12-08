@@ -36,3 +36,31 @@ export type GridEdge = {
   y: number;
   vertical: boolean; // true if vertical edge (right of x,y), false if horizontal (bottom of x,y)
 };
+
+// --- LOGGING TYPES ---
+
+export type ActionType = 
+  | 'GAME_START'
+  | 'LEVEL_LOAD'
+  | 'MOVE_PIECE'
+  | 'CUT_PIECE'
+  | 'ROTATE_PIECE'
+  | 'FLIP_PIECE'
+  | 'UNDO'
+  | 'REDO'
+  | 'RESET_LEVEL'
+  | 'GET_HINT'
+  | 'MODE_CHANGE'
+  | 'WIN';
+
+export interface ActionLogEntry {
+  timestamp: number;
+  type: ActionType;
+  details?: any; // JSON serializable details about the action
+}
+
+export interface UserSessionPayload {
+  userName: string;
+  sessionId: string;
+  actions: ActionLogEntry[];
+}

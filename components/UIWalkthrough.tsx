@@ -4,7 +4,7 @@ import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 export interface TourStep {
   targetId?: string; // If undefined, modal is centered
   title: string;
-  content: string;
+  content: React.ReactNode;
   position?: 'top' | 'bottom' | 'left' | 'right';
 }
 
@@ -17,6 +17,8 @@ interface UIWalkthroughProps {
 const UIWalkthrough: React.FC<UIWalkthroughProps> = ({ steps, isOpen, onClose }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  // Used to force re-render on resize for centered modal calculation
+  const [, setTick] = useState(0);
 
   // Reset step when opening
   useEffect(() => {
@@ -27,6 +29,7 @@ const UIWalkthrough: React.FC<UIWalkthroughProps> = ({ steps, isOpen, onClose })
 
   // Update rect when step changes or window resizes
   const updateRect = useCallback(() => {
+    setTick(t => t + 1);
     const step = steps[currentStep];
     if (step.targetId) {
       const el = document.getElementById(step.targetId);
@@ -72,29 +75,34 @@ const UIWalkthrough: React.FC<UIWalkthroughProps> = ({ steps, isOpen, onClose })
 
   // Calculate Tooltip Position
   const getTooltipStyle = () => {
+    const TOOLTIP_WIDTH = 300;
+    const windowWidth = window.innerWidth;
+
     if (!targetRect) {
+      // Centered calculation in pixels to avoid transform-origin issues during transition
+      const left = Math.max(10, (windowWidth - TOOLTIP_WIDTH) / 2);
+      
       return {
         top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        maxWidth: '320px',
-        width: '90%'
+        left: `${left}px`,
+        transform: 'translateY(-50%)',
+        maxWidth: '90vw',
+        width: `${TOOLTIP_WIDTH}px`
       };
     }
 
     const gap = 12;
-    const tooltipWidth = 300; // Approx max width
     
     // Default to bottom if not specified
     let top = targetRect.bottom + gap;
-    let left = targetRect.left + (targetRect.width / 2) - (tooltipWidth / 2);
+    let left = targetRect.left + (targetRect.width / 2) - (TOOLTIP_WIDTH / 2);
 
     if (step.position === 'top') {
       top = targetRect.top - gap; 
-      // We'll handle the translateY(-100%) in the render to keep logic simple
+      // We'll handle the translateY(-100%) in the return object
     } else if (step.position === 'left') {
       top = targetRect.top;
-      left = targetRect.left - tooltipWidth - gap;
+      left = targetRect.left - TOOLTIP_WIDTH - gap;
     } else if (step.position === 'right') {
       top = targetRect.top;
       left = targetRect.right + gap;
@@ -102,15 +110,18 @@ const UIWalkthrough: React.FC<UIWalkthroughProps> = ({ steps, isOpen, onClose })
 
     // Keep within viewport (simple clamp)
     if (left < 10) left = 10;
-    if (left + tooltipWidth > window.innerWidth - 10) left = window.innerWidth - tooltipWidth - 10;
+    if (left + TOOLTIP_WIDTH > windowWidth - 10) left = windowWidth - TOOLTIP_WIDTH - 10;
 
     return {
-      top: step.position === 'top' ? `${top}px` : `${top}px`,
+      top: `${top}px`,
       left: `${left}px`,
       transform: step.position === 'top' ? 'translateY(-100%)' : 'none',
-      width: '300px'
+      width: `${TOOLTIP_WIDTH}px`,
+      maxWidth: '90vw'
     };
   };
+
+  const tooltipStyle = getTooltipStyle();
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden touch-none">
@@ -136,7 +147,7 @@ const UIWalkthrough: React.FC<UIWalkthroughProps> = ({ steps, isOpen, onClose })
       {/* Tooltip Card */}
       <div 
         className="absolute bg-white text-slate-900 p-5 rounded-xl shadow-2xl transition-all duration-300 z-50 flex flex-col gap-3 border-2 border-blue-500 animate-fade-in"
-        style={getTooltipStyle()}
+        style={tooltipStyle}
       >
         <div className="flex justify-between items-start">
           <h3 className="font-bold text-lg leading-tight">{step.title}</h3>
@@ -145,9 +156,9 @@ const UIWalkthrough: React.FC<UIWalkthroughProps> = ({ steps, isOpen, onClose })
           </button>
         </div>
         
-        <p className="text-sm text-slate-600 leading-relaxed">
+        <div className="text-sm text-slate-600 leading-relaxed">
           {step.content}
-        </p>
+        </div>
 
         <div className="flex justify-between items-center mt-2 pt-3 border-t border-slate-100">
           <div className="text-xs text-slate-400 font-medium">

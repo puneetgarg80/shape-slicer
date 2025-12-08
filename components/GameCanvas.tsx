@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Piece, Cell, Coordinate, GameMode } from '../types';
+import { Piece, Cell, Coordinate, GameMode, ActionType } from '../types';
 import { getAbsoluteCells, performCut, pointsToEdges, interpolatePoints, checkSolution, checkShapeMatch, getEdgeAsKey, parseEdgeKey } from '../utils/geometry';
 import { CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, DEFAULT_TARGET_OFFSET, COLORS } from '../constants';
 import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, FlipVertical, Sparkles, RefreshCw, Undo, Redo, PenTool, Eraser, Trash2, Info, X, Target, Swords, Dumbbell, ChevronLeft, ChevronRight, Plus, Check, Circle, Footprints } from 'lucide-react';
@@ -31,6 +31,8 @@ interface GameCanvasProps {
   onNextLevel: () => void;
   isEditorMode: boolean;
   onCreateLevel: () => void;
+  // Logger
+  onLogAction: (type: ActionType, details?: any) => void;
 }
 
 // Helper to calculate center of piece's bounding box in absolute grid coords
@@ -48,7 +50,16 @@ const getPieceCenter = (p: Piece): Coordinate => {
 const TOUR_STEPS: TourStep[] = [
   {
     title: "Welcome to Shape Slicer",
-    content: "Your goal is to cut and rearrange the colored pieces to match the target shape.",
+    content: (
+      <div>
+        Your goal is to
+        <ul className="list-disc pl-4 mt-2 space-y-1">
+          <li>Cut given shape into 2 pieces</li>
+          <li>Each piece should have at least 3 squares.</li>
+          <li>Rearrange these pieces to match the target shape</li>
+        </ul>
+      </div>
+    ),
     targetId: undefined // Center
   },
   {
@@ -89,11 +100,23 @@ const TOUR_STEPS: TourStep[] = [
   }
 ];
 
+const ObjectiveRow = ({ label, isMet }: { label: string, isMet: boolean }) => (
+  <div className={`flex items-center gap-1.5 text-[10px] sm:text-xs transition-colors duration-300 ${isMet ? 'text-emerald-400 font-medium' : 'text-slate-500'}`}>
+    {isMet ? (
+      <Check size={12} strokeWidth={3} className="text-emerald-400 shrink-0" />
+    ) : (
+      <Circle size={10} strokeWidth={2} className="text-slate-600 shrink-0" />
+    )}
+    <span>{label}</span>
+  </div>
+);
+
 const GameCanvas: React.FC<GameCanvasProps> = ({ 
   pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hint, resetLevel,
   onUndo, onRedo, canUndo, canRedo, onCut,
   drawnEdges, setDrawnEdges,
-  appMode, setAppMode, levelIndex, totalLevels, onPrevLevel, onNextLevel, isEditorMode, onCreateLevel
+  appMode, setAppMode, levelIndex, totalLevels, onPrevLevel, onNextLevel, isEditorMode, onCreateLevel,
+  onLogAction
 }) => {
   const [mode, setMode] = useState<GameMode>(GameMode.PEN);
   const [showRules, setShowRules] = useState(false);
@@ -103,6 +126,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<Coordinate | null>(null); // Pixel offset from top-left of piece
   const [dragPosition, setDragPosition] = useState<Coordinate | null>(null); // Current raw pixel position of top-left of piece
+  const [dragStartGridPos, setDragStartGridPos] = useState<Coordinate | null>(null); // To detect if move actually happened
 
   // Cutting (Drawing) - Local transient state
   const [lastDrawGridPos, setLastDrawGridPos] = useState<Coordinate | null>(null);
@@ -181,6 +205,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           const piecePixelY = p.position.y * CELL_SIZE;
           setDragOffset({ x: rawX - piecePixelX, y: rawY - piecePixelY });
           setDragPosition({ x: piecePixelX, y: piecePixelY });
+          setDragStartGridPos({ x: p.position.x, y: p.position.y });
 
           // Bring to front
           const newPieces = [...pieces];
@@ -244,6 +269,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     if (mode === GameMode.MOVE && selectedPieceId && dragPosition) {
       const newGridX = Math.round(dragPosition.x / CELL_SIZE);
       const newGridY = Math.round(dragPosition.y / CELL_SIZE);
+      
+      // Only Log/Update if moved
+      const moved = !dragStartGridPos || newGridX !== dragStartGridPos.x || newGridY !== dragStartGridPos.y;
 
       setPieces(prev => prev.map(p => {
         if (p.id === selectedPieceId) {
@@ -251,9 +279,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         }
         return p;
       }));
+      
+      if (moved) {
+        onLogAction('MOVE_PIECE', { pieceId: selectedPieceId, from: dragStartGridPos, to: {x: newGridX, y: newGridY} });
+      }
 
       setDragOffset(null);
       setDragPosition(null);
+      setDragStartGridPos(null);
 
       const updatedPieces = pieces.map(p => p.id === selectedPieceId ? { ...p, position: { x: newGridX, y: newGridY } } : p);
       if (checkSolution(updatedPieces, targetCells)) {
@@ -295,6 +328,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       setMode(GameMode.MOVE);
       if (piecesToAdd.length > 0) setSelectedPieceId(piecesToAdd[piecesToAdd.length - 1].id);
       
+      onLogAction('CUT_PIECE', { edges: Array.from(drawnEdges), piecesCreated: piecesToAdd.length });
+      
       // Notify parent about the cut
       if (onCut) onCut();
     }
@@ -309,6 +344,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const handleRotate = (dir: 1 | -1) => {
     if (!selectedPieceId) return;
+    
+    onLogAction('ROTATE_PIECE', { pieceId: selectedPieceId, direction: dir });
+
     setPieces(prev => {
       const piece = prev.find(p => p.id === selectedPieceId);
       if (!piece) return prev;
@@ -345,6 +383,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const handleFlipHorizontal = () => {
     if (!selectedPieceId) return;
+    onLogAction('FLIP_PIECE', { pieceId: selectedPieceId, axis: 'horizontal' });
+
     setPieces(prev => {
       const piece = prev.find(p => p.id === selectedPieceId);
       if (!piece) return prev;
@@ -372,6 +412,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const handleFlipVertical = () => {
     if (!selectedPieceId) return;
+    onLogAction('FLIP_PIECE', { pieceId: selectedPieceId, axis: 'vertical' });
+
     setPieces(prev => {
       const piece = prev.find(p => p.id === selectedPieceId);
       if (!piece) return prev;
@@ -417,171 +459,83 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     
     <div className="flex flex-col h-full w-full max-w-md mx-auto relative bg-puzzle-bg overflow-hidden touch-none select-none">
       
-      {/* --- HEADER --- */}
-      <div className="flex flex-col bg-slate-900/80 backdrop-blur border-b border-slate-700 z-10">
-        <div className="flex justify-between items-center p-3">
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">Shape Slicer</h1>
-            <div className="text-xs text-slate-400">Match the target shape</div>
-          </div>
-          <div className="flex gap-1 items-center">
-              
-              {/* OBJECTIVES MINI-WIDGET */}
-              <div id="tour-objectives" className="flex flex-col items-end mr-2 space-y-[2px]">
-                  <div className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider transition-colors duration-300 ${hasTwoPieces ? 'text-green-400' : 'text-slate-500'}`}>
-                      <span>2 Pieces</span>
-                      {hasTwoPieces ? <Check size={10} strokeWidth={3} /> : <Circle size={10} strokeWidth={2} />}
-                  </div>
-                  <div className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider transition-colors duration-300 ${hasMinCells ? 'text-green-400' : 'text-slate-500'}`}>
-                      <span>3+ Cells</span>
-                      {hasMinCells ? <Check size={10} strokeWidth={3} /> : <Circle size={10} strokeWidth={2} />}
-                  </div>
-                  <div className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider transition-colors duration-300 ${matchesTarget ? 'text-green-400' : 'text-slate-500'}`}>
-                      <span>Target</span>
-                      {matchesTarget ? <Check size={10} strokeWidth={3} /> : <Circle size={10} strokeWidth={2} />}
-                  </div>
-              </div>
+      {/* --- COMPACT HEADER --- */}
+      <div className="bg-slate-900 border-b border-slate-800 z-30 shadow-md p-3 pb-2 flex flex-col gap-2">
+        {/* Row 1: Title & Controls */}
+        <div className="flex justify-between items-center">
+            <h1 className="text-lg font-extrabold text-white tracking-tight font-sans">Shape Slicer</h1>
+            
+            <div className="flex items-center gap-2">
+                <div className="flex bg-slate-800 p-0.5 rounded-lg">
+                  <button 
+                    onClick={() => setAppMode('ARENA')}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] sm:text-xs font-bold transition-all ${appMode === 'ARENA' ? 'bg-slate-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    <Swords size={12} /> Arena
+                  </button>
+                  <button 
+                    onClick={() => setAppMode('GYM')}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] sm:text-xs font-bold transition-all ${appMode === 'GYM' ? 'bg-slate-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    <Dumbbell size={12} /> Gym
+                  </button>
+                </div>
 
-              <button 
-                onClick={() => setShowRules(true)}
-                className="p-2 rounded-full text-slate-400 hover:bg-slate-800 hover:text-white transition"
-                aria-label="Rules"
-              >
-                <Info size={18} />
-              </button>
-              <button 
-                onClick={onUndo} 
-                disabled={!canUndo}
-                className={`p-2 rounded-full transition ${canUndo ? 'text-slate-200 hover:bg-slate-700 active:scale-95' : 'text-slate-700'}`}
-                aria-label="Undo"
-              >
-                <Undo size={18} />
-              </button>
-              <button 
-                onClick={onRedo} 
-                disabled={!canRedo}
-                className={`p-2 rounded-full transition ${canRedo ? 'text-slate-200 hover:bg-slate-700 active:scale-95' : 'text-slate-700'}`}
-                aria-label="Redo"
-              >
-                <Redo size={18} />
-              </button>
-              <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-              <button onClick={handleResetLevel} className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 active:scale-95 transition">
-                <RefreshCw size={18} />
-              </button>
-              <button 
-                id="tour-hint"
-                onClick={onRequestHint} 
-                disabled={!!hint}
-                className={`p-2 rounded-full transition active:scale-95 ${hint ? 'bg-purple-900 text-purple-300' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}
-              >
-                <Sparkles size={18} />
-              </button>
-          </div>
+                {/* Level Nav */}
+                {(appMode === 'GYM' || isEditorMode) && (
+                  <div className="flex items-center bg-slate-800 rounded-lg p-0.5">
+                    {appMode === 'GYM' && (
+                        <>
+                            <button onClick={onPrevLevel} disabled={levelIndex === 0} className="p-1 rounded hover:bg-slate-700 disabled:opacity-30 text-slate-300">
+                                <ChevronLeft size={14} />
+                            </button>
+                            <span className="text-[10px] font-bold px-1 text-slate-300 min-w-[2rem] text-center">
+                                {levelIndex + 1}/{totalLevels}
+                            </span>
+                            <button onClick={onNextLevel} disabled={levelIndex === totalLevels - 1} className="p-1 rounded hover:bg-slate-700 disabled:opacity-30 text-slate-300">
+                                <ChevronRight size={14} />
+                            </button>
+                        </>
+                    )}
+                    {isEditorMode && (
+                        <button onClick={onCreateLevel} className="p-1 ml-1 rounded hover:bg-slate-700 text-slate-300" title="Create">
+                            <Plus size={14} />
+                        </button>
+                    )}
+                  </div>
+                )}
+            </div>
         </div>
 
-        {/* --- SUBHEADER (TOGGLE & NAV) --- */}
-        <div className="flex items-center justify-between px-3 pb-3">
-           <div className="flex bg-slate-800 p-1 rounded-lg">
-             <button 
-               onClick={() => setAppMode('ARENA')}
-               className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${appMode === 'ARENA' ? 'bg-slate-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-             >
-                <Swords size={14} /> Arena
-             </button>
-             <button 
-               onClick={() => setAppMode('GYM')}
-               className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${appMode === 'GYM' ? 'bg-slate-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-             >
-                <Dumbbell size={14} /> Gym
-             </button>
-           </div>
+        {/* Row 2: Horizontal Objectives */}
+        <div id="tour-objectives" className="flex flex-wrap gap-x-4 gap-y-1 items-center">
+            <ObjectiveRow label="Match target" isMet={matchesTarget} />
+            <ObjectiveRow label="2 pieces" isMet={hasTwoPieces} />
+            <ObjectiveRow label="3+ squares each" isMet={hasMinCells} />
+        </div>
 
-           <div className="flex items-center gap-2">
-             {/* Gym Navigation */}
-             {appMode === 'GYM' && (
-               <div className="flex items-center bg-slate-800 rounded-lg p-1">
-                 <button onClick={onPrevLevel} disabled={levelIndex === 0} className="p-1 rounded hover:bg-slate-700 disabled:opacity-30">
-                    <ChevronLeft size={16} />
-                 </button>
-                 <span className="text-xs font-bold px-2 text-slate-300 min-w-[3rem] text-center">
-                    {levelIndex + 1} / {totalLevels}
-                 </span>
-                 <button onClick={onNextLevel} disabled={levelIndex === totalLevels - 1} className="p-1 rounded hover:bg-slate-700 disabled:opacity-30">
-                    <ChevronRight size={16} />
-                 </button>
-               </div>
-             )}
-
-             {/* Editor Button */}
-             {isEditorMode && (
-               <button 
-                 onClick={onCreateLevel}
-                 className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-               >
-                 <Plus size={14} /> Create
-               </button>
-             )}
-           </div>
+        {/* Row 3: Action Toolbar (Fixed above canvas) */}
+        <div className="flex justify-center pt-1">
+             <div className="flex items-center gap-2 bg-slate-800 p-1 rounded-full border border-slate-700/50 shadow-sm">
+                 <button onClick={() => setShowRules(true)} className="p-1 rounded-full text-slate-400 hover:bg-slate-700 hover:text-white transition"><Info size={18} /></button>
+                 <button onClick={onUndo} disabled={!canUndo} className={`p-1 rounded-full transition ${canUndo ? 'text-slate-400 hover:text-white hover:bg-slate-700 active:scale-95' : 'text-slate-700'}`}><Undo size={18} /></button>
+                 <button onClick={onRedo} disabled={!canRedo} className={`p-1 rounded-full transition ${canRedo ? 'text-slate-400 hover:text-white hover:bg-slate-700 active:scale-95' : 'text-slate-700'}`}><Redo size={18} /></button>
+                 <div className="w-px h-5 bg-slate-700 mx-0.5"></div>
+                 <button onClick={handleResetLevel} className="p-1 rounded-full text-slate-400 hover:bg-slate-700 hover:text-white active:scale-95 transition"><RefreshCw size={18} /></button>
+                 <button id="tour-hint" onClick={onRequestHint} disabled={!!hint} className={`p-1 rounded-full transition active:scale-95 shadow-sm ${hint ? 'bg-purple-900 text-purple-300' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}><Sparkles size={16} fill="currentColor" /></button>
+             </div>
         </div>
       </div>
 
-      {/* --- HINT --- */}
-      {hint && (
-        <div className="absolute top-32 left-4 right-4 z-20 bg-purple-900/90 text-purple-100 p-3 rounded-lg text-sm border border-purple-500 shadow-xl animate-bounce-slight">
-          <strong>AI Hint:</strong> {hint}
-        </div>
-      )}
-
-      {/* --- FLOATING ACTION BUTTONS --- */}
-      <div className="absolute top-32 right-4 z-30 flex flex-col gap-2 pointer-events-none">
+      {/* --- CANVAS CONTAINER --- */}
+      <div id="tour-canvas" className="flex-1 relative overflow-hidden flex items-start justify-center bg-slate-900">
         
-        {/* Cut Actions */}
-        {drawnEdges.size > 0 && (
-           <div className="flex flex-col gap-2 animate-fade-in">
-             <button 
-                onClick={executeCut}
-                className="w-12 h-12 rounded-full bg-rose-600 hover:bg-rose-500 text-white shadow-lg flex items-center justify-center animate-bounce-slight pointer-events-auto transition-transform active:scale-95"
-                title="Execute Cut"
-              >
-                <Scissors size={24} />
-             </button>
-             <button 
-                onClick={clearDrawing}
-                className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white shadow-md flex items-center justify-center pointer-events-auto transition-transform active:scale-95"
-                title="Clear Drawing"
-              >
-                <Trash2 size={20} />
-             </button>
-           </div>
-        )}
-
-        {/* Move Actions */}
-        {mode === GameMode.MOVE && selectedPieceId && (
-          <div className="flex flex-col gap-2 animate-fade-in">
-             <button onClick={() => handleRotate(-1)} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white shadow-md flex items-center justify-center pointer-events-auto transition-transform active:scale-95" title="Rotate Left">
-               <RotateCcw size={20} />
-             </button>
-             <button onClick={() => handleFlipHorizontal()} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white shadow-md flex items-center justify-center pointer-events-auto transition-transform active:scale-95" title="Flip Horizontal">
-               <FlipHorizontal size={20} />
-             </button>
-             <button onClick={() => handleFlipVertical()} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white shadow-md flex items-center justify-center pointer-events-auto transition-transform active:scale-95" title="Flip Vertical">
-               <FlipVertical size={20} />
-             </button>
-             <button onClick={() => handleRotate(1)} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white shadow-md flex items-center justify-center pointer-events-auto transition-transform active:scale-95" title="Rotate Right">
-               <RotateCw size={20} />
-             </button>
-          </div>
-        )}
-      </div>
-
-      {/* --- CANVAS --- */}
-      <div id="tour-canvas" className="flex-1 overflow-hidden relative flex items-center justify-center">
+        {/* --- CANVAS SVG --- */}
         <svg 
           ref={svgRef}
-          className={`w-full h-full bg-slate-900 ${mode === GameMode.MOVE ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
+          className={`w-full h-full ${mode === GameMode.MOVE ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
           viewBox={`0 0 ${GRID_WIDTH * CELL_SIZE} ${GRID_HEIGHT * CELL_SIZE}`}
-          preserveAspectRatio="xMidYMid meet"
+          preserveAspectRatio="xMidYMin meet"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -668,59 +622,75 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           {/* Drawn Cut Path */}
           {drawnEdges.size > 0 && Array.from(drawnEdges).map((key: string) => {
             const e = parseEdgeKey(key);
-            // Render edge
             const x1 = e.vertical ? e.x + 1 : e.x;
             const y1 = e.vertical ? e.y : e.y + 1;
             const x2 = e.vertical ? e.x + 1 : e.x + 1;
             const y2 = e.vertical ? e.y + 1 : e.y + 1;
 
             return (
-              <line 
-                key={key}
-                x1={x1 * CELL_SIZE}
-                y1={y1 * CELL_SIZE}
-                x2={x2 * CELL_SIZE}
-                y2={y2 * CELL_SIZE}
-                stroke="#f43f5e"
-                strokeWidth="4"
-                strokeLinecap="round"
-              />
+              <line key={key} x1={x1 * CELL_SIZE} y1={y1 * CELL_SIZE} x2={x2 * CELL_SIZE} y2={y2 * CELL_SIZE} stroke="#f43f5e" strokeWidth="4" strokeLinecap="round" />
             );
           })}
-          
         </svg>
+
+        {/* --- FLOATING ACTION BUTTONS (Right) --- */}
+        <div className="absolute top-20 right-4 z-30 flex flex-col gap-2 pointer-events-none">
+            {drawnEdges.size > 0 && (
+            <div className="flex flex-col gap-2 animate-fade-in pointer-events-auto">
+                <button onClick={executeCut} className="w-12 h-12 rounded-full bg-rose-600 hover:bg-rose-500 text-white shadow-lg flex items-center justify-center animate-bounce-slight transition-transform active:scale-95" title="Execute Cut">
+                    <Scissors size={24} />
+                </button>
+                <button onClick={clearDrawing} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white shadow-md flex items-center justify-center transition-transform active:scale-95" title="Clear Drawing">
+                    <Trash2 size={20} />
+                </button>
+            </div>
+            )}
+
+            {mode === GameMode.MOVE && selectedPieceId && (
+            <div className="flex flex-col gap-2 animate-fade-in pointer-events-auto">
+                <button onClick={() => handleRotate(-1)} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white shadow-md flex items-center justify-center transition-transform active:scale-95"><RotateCcw size={20} /></button>
+                <button onClick={() => handleFlipHorizontal()} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white shadow-md flex items-center justify-center transition-transform active:scale-95"><FlipHorizontal size={20} /></button>
+                <button onClick={() => handleFlipVertical()} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white shadow-md flex items-center justify-center transition-transform active:scale-95"><FlipVertical size={20} /></button>
+                <button onClick={() => handleRotate(1)} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white shadow-md flex items-center justify-center transition-transform active:scale-95"><RotateCw size={20} /></button>
+            </div>
+            )}
+        </div>
+
+        {/* --- FLOATING FOOTER (Mode Selector) --- */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-xs px-4">
+            <div id="tour-modes" className="flex bg-slate-800/90 backdrop-blur-md p-1 rounded-2xl shadow-2xl border border-slate-700/50 justify-between">
+                <button 
+                    id="tour-mode-move"
+                    onClick={() => setMode(GameMode.MOVE)}
+                    className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === GameMode.MOVE ? 'bg-slate-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                >
+                    <Move size={18} /> Move
+                </button>
+                <button 
+                    id="tour-mode-pen"
+                    onClick={() => setMode(GameMode.PEN)}
+                    className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === GameMode.PEN ? 'bg-slate-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                >
+                    <PenTool size={18} /> Pen
+                </button>
+                <button 
+                    id="tour-mode-eraser"
+                    onClick={() => setMode(GameMode.ERASER)}
+                    className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${mode === GameMode.ERASER ? 'bg-slate-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                >
+                    <Eraser size={18} /> Eraser
+                </button>
+            </div>
+        </div>
+
       </div>
 
-      {/* --- FOOTER --- */}
-      <div className="bg-slate-900 border-t border-slate-700 p-4 pb-8 safe-pb z-20">
-        <div className="flex flex-col gap-4">
-          
-          {/* Mode Selector */}
-          <div id="tour-modes" className="flex bg-slate-800 p-1 rounded-xl self-center shadow-lg w-full max-w-xs justify-between">
-              <button 
-                id="tour-mode-move"
-                onClick={() => setMode(GameMode.MOVE)}
-                className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${mode === GameMode.MOVE ? 'bg-slate-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-              >
-                <Move size={18} /> Move
-              </button>
-              <button 
-                id="tour-mode-pen"
-                onClick={() => setMode(GameMode.PEN)}
-                className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${mode === GameMode.PEN ? 'bg-slate-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-              >
-                <PenTool size={18} /> Pen
-              </button>
-              <button 
-                id="tour-mode-eraser"
-                onClick={() => setMode(GameMode.ERASER)}
-                className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${mode === GameMode.ERASER ? 'bg-slate-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-              >
-                <Eraser size={18} /> Eraser
-              </button>
-          </div>
+      {/* --- HINT POPUP --- */}
+      {hint && (
+        <div className="absolute top-24 left-4 right-4 z-40 bg-purple-900/95 backdrop-blur text-purple-100 p-3 rounded-lg text-sm border border-purple-500 shadow-2xl animate-bounce-slight">
+          <strong>AI Hint:</strong> {hint}
         </div>
-      </div>
+      )}
 
       {/* --- RULES MODAL --- */}
       {showRules && (
