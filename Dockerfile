@@ -13,3 +13,15 @@ COPY client/ ./
 
 # Build the React application
 RUN npm run build
+
+# Stage 2: Serve the built application with Nginx
+FROM nginx:alpine
+
+COPY --from=client-build /app/client/dist /usr/share/nginx/html
+
+# Optional: Copy a custom Nginx configuration if needed
+# COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
