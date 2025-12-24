@@ -342,40 +342,21 @@ const App: React.FC = () => {
         break;
 
       case 'CUT_PIECE':
-        // This is hard to replay exactly without deterministic history of pieces.
-        // Simplified: Visual cut relies on 'drawnEdges'. 
-        // We'd need to simulate the cut operation which is idempotent if state matches.
-        // For this prototype, we might skip complex physics or just trigger the cut if edges are provided in log.
-        // See GameCanvas.tsx cut logic. The log currently stores 'edges' and 'piecesCreated'.
-        // To properly replay, we can try to inject the edges and call performCut logic.
-        // However, GameCanvas handles the cut logic locally.
-        // A better approach for Replay is if the log contained the *State Snapshot* or precise piece data after cut.
-        // Given current log structure only records *intent*, exact replay of cuts is tricky if we don't duplicate logic here.
-        // For now, let's just log it.
-        console.log("Replaying Cut:", action.details);
+        if (action.details.newPieces) {
+          setPieces(action.details.newPieces);
+        }
         break;
 
-      // Ideal: Log should contain 'NextState' or we execute the exact same reducer.
-      // Limitation: CUT logic is inside GameCanvas component state (local).
-
       case 'ROTATE_PIECE':
-        const { pieceId: rotId, direction } = action.details;
-        setPieces(prev => prev.map(p => {
-          if (p.id === rotId) {
-            return { ...p, rotation: (p.rotation + (direction * 90) + 360) % 360 };
-          }
-          return p;
-        }));
+        if (action.details.newPieces) {
+          setPieces(action.details.newPieces);
+        }
         break;
 
       case 'FLIP_PIECE':
-        const { pieceId: flipId, axis } = action.details;
-        setPieces(prev => prev.map(p => {
-          if (p.id === flipId) {
-            return { ...p, isFlipped: !p.isFlipped, rotation: axis === 'vertical' ? (p.rotation + 180) % 360 : p.rotation };
-          }
-          return p;
-        }));
+        if (action.details.newPieces) {
+          setPieces(action.details.newPieces);
+        }
         break;
 
       case 'WIN':
