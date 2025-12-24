@@ -79,10 +79,10 @@ const App: React.FC = () => {
         };
 
         // MOCK SERVER SEND
-        console.info(`[SERVER SYNC] Sending ${payload.actions.length} actions for user ${userName}...`);
+        console.info(`[SERVER SYNC] Sending ${payload.actions.length} actions (cumulative) for user ${userName}...`);
 
-        // Clear log after "send"
-        actionLog.current = [];
+        // Don't clear logs, send full history every time
+        // actionLog.current = [];
       }
     }, 5000); // Send every 5 seconds
 
