@@ -24,10 +24,10 @@ const NameModal: React.FC<NameModalProps> = ({ onSubmit }) => {
         <div className="w-16 h-16 bg-slate-700 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6">
           <User size={32} />
         </div>
-        
+
         <h2 className="text-2xl font-bold text-white text-center mb-2">Welcome</h2>
         <p className="text-slate-400 text-center mb-6 text-sm">
-          Please enter your name to start recording your puzzle solving journey.
+          Please enter your name.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
