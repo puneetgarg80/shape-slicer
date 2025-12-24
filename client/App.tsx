@@ -26,11 +26,11 @@ const App: React.FC = () => {
 
   const [customLevels, setCustomLevels] = useState<LevelData[]>([]);
   const [levelIndex, setLevelIndex] = useState(0);
-  
+
   // Flattened Levels
   const activeLevels = [...LEVELS, ...customLevels];
   const currentLevel = activeLevels[levelIndex] || activeLevels[0];
-  
+
   // Editor mode detection
   const [isEditorMode] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -40,7 +40,7 @@ const App: React.FC = () => {
   // Game State
   const [pieces, setPieces] = useState<Piece[]>([]);
   const [drawnEdges, setDrawnEdges] = useState<Set<string>>(new Set());
-  
+
   // History State
   const [history, setHistory] = useState<Piece[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -78,7 +78,7 @@ const App: React.FC = () => {
 
         // MOCK SERVER SEND
         console.info(`[SERVER SYNC] Sending ${payload.actions.length} actions for user ${userName}...`);
-        
+
         // Clear log after "send"
         actionLog.current = [];
       }
@@ -98,7 +98,7 @@ const App: React.FC = () => {
 
   const loadLevel = (level: LevelData, levelIdx: number, resetStats: boolean = true) => {
     const { normalized } = normalizePiece(level.initialShape);
-    
+
     const startPos = level.startOffset || START_OFFSET;
 
     const initialPiece: Piece = {
@@ -119,7 +119,7 @@ const App: React.FC = () => {
     setHint(null);
     setShowWinModal(false);
     setDrawnEdges(new Set()); // Clear drawings on level load
-    
+
     if (resetStats) {
       setCutCount(0);
     }
@@ -182,7 +182,7 @@ const App: React.FC = () => {
     }
     setShowWinModal(false);
   };
-  
+
   const handlePrevLevel = () => {
     if (levelIndex > 0) {
       const newIndex = levelIndex - 1;
@@ -211,12 +211,12 @@ const App: React.FC = () => {
     const updatedCustomLevels = [...customLevels, newLevel];
     setCustomLevels(updatedCustomLevels);
     setIsBuilderOpen(false);
-    
+
     // Jump to the newly created level
     // Recompute active levels with new one included
     const allLevels = [...LEVELS, ...updatedCustomLevels];
     const newIndex = allLevels.length - 1;
-    
+
     setLevelIndex(newIndex);
     loadLevel(allLevels[newIndex], newIndex, true);
   };
@@ -228,43 +228,43 @@ const App: React.FC = () => {
   if (isBuilderOpen) {
     return (
       <div className="h-screen w-screen bg-slate-950 text-white font-sans relative">
-        <LevelBuilder 
-          onSave={handleSaveCustomLevel} 
-          onCancel={() => setIsBuilderOpen(false)} 
+        <LevelBuilder
+          onSave={handleSaveCustomLevel}
+          onCancel={() => setIsBuilderOpen(false)}
         />
       </div>
     );
   }
 
   if (isGameComplete) {
-     return (
-        <div className="h-screen w-screen bg-slate-950 text-white font-sans flex items-center justify-center p-4">
-             <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-yellow-500 max-w-sm w-full text-center">
-                <div className="w-20 h-20 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-yellow-500/50">
-                   <Swords className="w-10 h-10 text-white" />
-                </div>
-                <h1 className="text-4xl font-bold text-white mb-2">
-                    Congratulations!
-                </h1>
-                <p className="text-slate-300 mb-8">
-                    You have mastered all the puzzles.
-                </p>
-                <div className="space-y-3">
-                    <button 
-                      onClick={handleRestartGame}
-                      className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg transition transform active:scale-95"
-                    >
-                      Play Again
-                    </button>
-                </div>
-             </div>
+    return (
+      <div className="h-screen w-screen bg-slate-950 text-white font-sans flex items-center justify-center p-4">
+        <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-yellow-500 max-w-sm w-full text-center">
+          <div className="w-20 h-20 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-yellow-500/50">
+            <Swords className="w-10 h-10 text-white" />
+          </div>
+          <h1 className="text-4xl font-bold text-white mb-2">
+            Congratulations!
+          </h1>
+          <p className="text-slate-300 mb-8">
+            You have mastered all the puzzles.
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={handleRestartGame}
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg transition transform active:scale-95"
+            >
+              Play Again
+            </button>
+          </div>
         </div>
-     );
+      </div>
+    );
   }
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-white font-sans relative">
-      <GameCanvas 
+      <GameCanvas
         pieces={pieces}
         setPieces={handleSetPieces}
         targetCells={currentLevel.targetCells}
@@ -282,17 +282,17 @@ const App: React.FC = () => {
         canRedo={historyIndex < history.length - 1}
         onCut={handleCutAction}
         onLogAction={logAction}
-        
+
         // Lifted State
         drawnEdges={drawnEdges}
         setDrawnEdges={setDrawnEdges}
-        
+
         // Navigation Props
         levelIndex={levelIndex}
         totalLevels={activeLevels.length}
         onPrevLevel={handlePrevLevel}
         onNextLevel={handleNextLevel}
-        
+
         // Editor Props
         isEditorMode={isEditorMode}
         onCreateLevel={() => setIsBuilderOpen(true)}
@@ -303,19 +303,19 @@ const App: React.FC = () => {
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className={`bg-slate-800 p-8 rounded-2xl shadow-2xl border border-green-500 max-w-sm w-full text-center transform scale-100 animate-bounce-slight`}>
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg bg-green-500 shadow-green-500/50`}>
-               <Dumbbell className="text-white" size={32} />
+              <Dumbbell className="text-white" size={32} />
             </div>
             <h2 className="text-3xl font-bold text-white mb-2">Solved!</h2>
             <p className="text-green-400 font-bold mb-1 uppercase tracking-widest text-xs">{currentLevel.name}</p>
             <p className="text-slate-300 mb-6">
-                Well done!
+              Well done, {userName}!
             </p>
-            
-            <button 
+
+            <button
               onClick={handleNextLevel}
               className={`w-full py-3 text-white rounded-xl font-bold text-lg shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500`}
             >
-              {levelIndex < activeLevels.length - 1 ? 'Next Level' : 'Finish'} 
+              {levelIndex < activeLevels.length - 1 ? 'Next Level' : 'Finish'}
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
             </button>
           </div>
