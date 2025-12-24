@@ -6,8 +6,9 @@ import { Piece, LevelData, ActionLogEntry, ActionType, UserSessionPayload } from
 import { LEVELS, COLORS, START_OFFSET } from './constants';
 import { normalizePiece } from './utils/geometry';
 import { getGeminiHint } from './services/geminiService';
-import { PlayCircle, Plus, Dumbbell, Swords, Share2, Copy } from 'lucide-react';
+import { PlayCircle, Plus, Dumbbell, Swords, Share2, Copy, Upload } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import ReplayControls from './components/ReplayControls';
 
 interface GameplayState {
   levelIndex: number;
@@ -38,6 +39,12 @@ const App: React.FC = () => {
     return params.get('mode') === 'editor';
   });
 
+  // Replay allowed detection
+  const [isReplayAllowed] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mode') === 'replay';
+  });
+
   // Game State
   const [pieces, setPieces] = useState<Piece[]>([]);
   const [drawnEdges, setDrawnEdges] = useState<Set<string>>(new Set());
@@ -55,6 +62,13 @@ const App: React.FC = () => {
   const [isGameComplete, setIsGameComplete] = useState(false);
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
 
+  // Replay State
+  const [isReplayMode, setIsReplayMode] = useState(false);
+  const [replayActions, setReplayActions] = useState<ActionLogEntry[]>([]);
+  const [replayStep, setReplayStep] = useState(0); // Index of the *next* action to apply
+  const [isPlaying, setIsPlaying] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // --- LOGGING SYSTEM ---
 
   const logAction = (type: ActionType, details?: any) => {
@@ -68,7 +82,7 @@ const App: React.FC = () => {
 
   // Sync to "Server" Interval
   useEffect(() => {
-    if (!userName) return;
+    if (!userName || isReplayMode) return; // Don't sync during replay
 
     const intervalId = setInterval(() => {
       if (actionLog.current.length > 0) {
@@ -223,20 +237,6 @@ const App: React.FC = () => {
     setTimeout(() => setHint(null), 10000);
   };
 
-  const handleSaveCustomLevel = (newLevel: LevelData) => {
-    const updatedCustomLevels = [...customLevels, newLevel];
-    setCustomLevels(updatedCustomLevels);
-    setIsBuilderOpen(false);
-
-    // Jump to the newly created level
-    // Recompute active levels with new one included
-    const allLevels = [...LEVELS, ...updatedCustomLevels];
-    const newIndex = allLevels.length - 1;
-
-    setLevelIndex(newIndex);
-    loadLevel(allLevels[newIndex], newIndex, true);
-  };
-
   const handleShare = async () => {
     const url = window.location.href;
     const text = `I just solved Level ${levelIndex + 1} (${currentLevel.name}) in Shape Slicer! Can you beat my score?`;
@@ -266,9 +266,228 @@ const App: React.FC = () => {
     }
   };
 
-  if (!userName) {
-    return <NameModal onSubmit={handleNameSubmit} />;
+  const handleSaveCustomLevel = (newLevel: LevelData) => {
+    const updatedCustomLevels = [...customLevels, newLevel];
+    setCustomLevels(updatedCustomLevels);
+    setIsBuilderOpen(false);
+
+    // Jump to the newly created level
+    // Recompute active levels with new one included
+    const allLevels = [...LEVELS, ...updatedCustomLevels];
+    const newIndex = allLevels.length - 1;
+
+    setLevelIndex(newIndex);
+    loadLevel(allLevels[newIndex], newIndex, true);
+  };
+
+  // --- REPLAY LOGIC ---
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        if (json.actions && Array.isArray(json.actions)) {
+          // Start Replay
+          setIsReplayMode(true);
+          setReplayActions(json.actions);
+          setReplayStep(0);
+          setIsPlaying(false);
+
+          // Parse first start action to set name if possible
+          const startAction = json.actions.find((a: ActionLogEntry) => a.type === 'GAME_START');
+          if (startAction?.details?.userName) {
+            setUserName(`Replay: ${startAction.details.userName}`);
+          } else {
+            setUserName('Replay Mode');
+          }
+
+          // Reset Board
+          // We need to find the first level load to set context, or just start blank
+          loadLevel(activeLevels[0], 0, true);
+        }
+      } catch (err) {
+        console.error("Failed to parse log file", err);
+        alert("Invalid log file");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const applyAction = (action: ActionLogEntry) => {
+    // This function mimics the reducers/handlers based on action type
+    // Note: This is an approximation. A true deterministic replay requires stricter state management (Redux).
+    // For now, we will map key actions to state updates.
+
+    switch (action.type) {
+      case 'LEVEL_LOAD':
+        // Find level by ID or Name
+        const levelId = action.details.levelId;
+        const levelIdx = activeLevels.findIndex(l => l.id === levelId);
+        if (levelIdx >= 0) {
+          loadLevel(activeLevels[levelIdx], levelIdx, true);
+          setLevelIndex(levelIdx);
+        }
+        break;
+
+      case 'MOVE_PIECE':
+        const { pieceId, to } = action.details;
+        setPieces(prev => prev.map(p => {
+          if (p.id === pieceId) return { ...p, position: to };
+          return p;
+        }));
+        break;
+
+      case 'CUT_PIECE':
+        // This is hard to replay exactly without deterministic history of pieces.
+        // Simplified: Visual cut relies on 'drawnEdges'. 
+        // We'd need to simulate the cut operation which is idempotent if state matches.
+        // For this prototype, we might skip complex physics or just trigger the cut if edges are provided in log.
+        // See GameCanvas.tsx cut logic. The log currently stores 'edges' and 'piecesCreated'.
+        // To properly replay, we can try to inject the edges and call performCut logic.
+        // However, GameCanvas handles the cut logic locally.
+        // A better approach for Replay is if the log contained the *State Snapshot* or precise piece data after cut.
+        // Given current log structure only records *intent*, exact replay of cuts is tricky if we don't duplicate logic here.
+        // For now, let's just log it.
+        console.log("Replaying Cut:", action.details);
+        break;
+
+      // Ideal: Log should contain 'NextState' or we execute the exact same reducer.
+      // Limitation: CUT logic is inside GameCanvas component state (local).
+
+      case 'ROTATE_PIECE':
+        const { pieceId: rotId, direction } = action.details;
+        setPieces(prev => prev.map(p => {
+          if (p.id === rotId) {
+            return { ...p, rotation: (p.rotation + (direction * 90) + 360) % 360 };
+          }
+          return p;
+        }));
+        break;
+
+      case 'FLIP_PIECE':
+        const { pieceId: flipId, axis } = action.details;
+        setPieces(prev => prev.map(p => {
+          if (p.id === flipId) {
+            return { ...p, isFlipped: !p.isFlipped, rotation: axis === 'vertical' ? (p.rotation + 180) % 360 : p.rotation };
+          }
+          return p;
+        }));
+        break;
+
+      case 'WIN':
+        setShowWinModal(true);
+        confetti({ particleCount: 50, spread: 50, origin: { y: 0.6 } });
+        break;
+
+      case 'RESET_LEVEL':
+        // find current level
+        loadLevel(currentLevel, levelIndex, false);
+        break;
+    }
+  };
+
+  // Auto-play effect
+  useEffect(() => {
+    let timer: any;
+    if (isReplayMode && isPlaying) {
+      timer = setInterval(() => {
+        setReplayStep(prev => {
+          if (prev < replayActions.length) {
+            const action = replayActions[prev];
+            applyAction(action);
+            return prev + 1;
+          } else {
+            setIsPlaying(false);
+            return prev;
+          }
+        });
+      }, 800); // 800ms per action
+    }
+    return () => clearInterval(timer);
+  }, [isReplayMode, isPlaying, replayActions, activeLevels, levelIndex, pieces]);  // Deps need careful checking
+
+
+  const handleReplayNext = () => {
+    if (replayStep < replayActions.length) {
+      applyAction(replayActions[replayStep]);
+      setReplayStep(prev => prev + 1);
+    }
+  };
+
+  const handleReplayPrev = () => {
+    // Bruteforce: To undo, we have to replay from start up to step-1
+    // Because our actions aren't all reversible (like Cut) without snapshots.
+    if (replayStep > 0) {
+      const targetStep = replayStep - 1;
+
+      // Reset Game to start
+      // We assume first action is usually load level or we just reload first level
+      // Then fast forward
+      const startAction = replayActions.find((a: ActionLogEntry) => a.type === 'GAME_START');
+      // Reload initial state (HACK: assume level 0 start for now or use the first LEVEL_LOAD found)
+      const firstLevelAction = replayActions.find(a => a.type === 'LEVEL_LOAD');
+      if (firstLevelAction) {
+        // Reset to that level
+        const lId = firstLevelAction.details.levelId;
+        const lIdx = activeLevels.findIndex(l => l.id === lId);
+        if (lIdx >= 0) loadLevel(activeLevels[lIdx], lIdx, true);
+      } else {
+        loadLevel(activeLevels[0], 0, true);
+      }
+
+      // Replay 0 -> targetStep
+      for (let i = 0; i < targetStep; i++) {
+        applyAction(replayActions[i]);
+      }
+      setReplayStep(targetStep);
+    }
+  };
+
+  const exitReplay = () => {
+    setIsReplayMode(false);
+    setReplayActions([]);
+    setReplayStep(0);
+    setIsPlaying(false);
+    setUserName(null); // Reset user to prompt login again or just clear replay name
+    window.location.reload(); // Simplest way to clear all game state artifacts
+  };
+
+  if (!userName && !isReplayMode) {
+    return (
+      <>
+        <NameModal onSubmit={handleNameSubmit} />
+        {/* Replay Upload Button overlay on NameModal or just accessible */}
+        {isReplayAllowed && (
+          <div className="fixed inset-0 z-[70] bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+            <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-blue-500 max-w-sm w-full text-center">
+              <h2 className="text-2xl font-bold text-white mb-4">Replay Mode</h2>
+              <p className="text-slate-300 mb-6">Upload a session log file to watch the replay.</p>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept=".json"
+                onChange={handleFileUpload}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg shadow-lg transition transform active:scale-95"
+              >
+                <Upload size={24} /> Upload Log File
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
+
+
 
   if (isBuilderOpen) {
     return (
@@ -382,6 +601,21 @@ const App: React.FC = () => {
           <span className="font-bold text-sm">Challenge copied to clipboard!</span>
         </div>
       )}
+
+      {isReplayMode && (
+        <ReplayControls
+          isPlaying={isPlaying}
+          onPlayPause={() => setIsPlaying(!isPlaying)}
+          onNext={handleReplayNext}
+          onPrev={handleReplayPrev}
+          onExit={exitReplay}
+          currentStep={replayStep}
+          totalSteps={replayActions.length}
+        />
+      )}
+
+      {/* Block interaction during replay */}
+      {isReplayMode && <div className="absolute inset-0 z-20 bg-transparent cursor-not-allowed" />}
     </div>
   );
 };
