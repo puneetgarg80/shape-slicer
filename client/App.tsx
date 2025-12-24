@@ -78,8 +78,17 @@ const App: React.FC = () => {
           actions: [...actionLog.current]
         };
 
-        // MOCK SERVER SEND
-        console.info(`[SERVER SYNC] Sending ${payload.actions.length} actions (cumulative) for user ${userName}...`);
+        // Real Server Sync
+        fetch('/api/logs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload)
+        })
+          .then(res => res.json())
+          .then(data => console.info(`[SERVER SYNC] Saved ${data.count} actions`))
+          .catch(err => console.error('[SERVER SYNC] Failed to save logs', err));
 
         // Don't clear logs, send full history every time
         // actionLog.current = [];
