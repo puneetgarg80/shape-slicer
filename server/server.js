@@ -1,8 +1,10 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { saveLog } from './storage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,15 +41,15 @@ app.post('/api/logs', (req, res) => {
         actions
     };
 
-    fs.writeFile(filePath, JSON.stringify(logData, null, 2), (err) => {
-        if (err) {
-            console.error('Error writing log file:', err);
-            return res.status(500).json({ error: 'Failed to save log' });
-        }
-
-        console.log(`[LOG] Saved ${actions.length} actions for session ${sessionId}`);
-        res.json({ success: true, count: actions.length });
-    });
+    saveLog(userName || 'anonymous', filename, logData)
+        .then(() => {
+            console.log(`[LOG] Saved ${actions.length} actions for session ${sessionId}`);
+            res.json({ success: true, count: actions.length });
+        })
+        .catch((err) => {
+            console.error('Error saving log:', err);
+            res.status(500).json({ error: 'Failed to save log' });
+        });
 });
 
 app.listen(PORT, () => {
