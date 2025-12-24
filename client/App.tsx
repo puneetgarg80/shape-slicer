@@ -6,7 +6,8 @@ import { Piece, LevelData, ActionLogEntry, ActionType, UserSessionPayload } from
 import { LEVELS, COLORS, START_OFFSET } from './constants';
 import { normalizePiece } from './utils/geometry';
 import { getGeminiHint } from './services/geminiService';
-import { PlayCircle, Plus, Dumbbell, Swords } from 'lucide-react';
+import { PlayCircle, Plus, Dumbbell, Swords, Share2, Copy } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 interface GameplayState {
   levelIndex: number;
@@ -50,6 +51,7 @@ const App: React.FC = () => {
 
   const [hint, setHint] = useState<string | null>(null);
   const [showWinModal, setShowWinModal] = useState(false);
+  const [showShareToast, setShowShareToast] = useState(false);
   const [isGameComplete, setIsGameComplete] = useState(false);
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
 
@@ -169,6 +171,11 @@ const App: React.FC = () => {
     if (!showWinModal) {
       logAction('WIN', { levelId: currentLevel.id, cuts: cutCount });
       setShowWinModal(true);
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
     }
   };
 
@@ -219,6 +226,35 @@ const App: React.FC = () => {
 
     setLevelIndex(newIndex);
     loadLevel(allLevels[newIndex], newIndex, true);
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const text = `I just solved Level ${levelIndex + 1} (${currentLevel.name}) in Shape Slicer! Can you beat my score?`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Shape Slicer Challenge',
+          text: text,
+          url: url
+        });
+        logAction('SHARE_CHALLENGE', { method: 'native', levelId: currentLevel.id });
+      } catch (err) {
+        // User cancelled or share failed
+        console.log('Share skipped/failed', err);
+      }
+    } else {
+      // Fallback to clipboard
+      try {
+        await navigator.clipboard.writeText(`${text} ${url}`);
+        setShowShareToast(true);
+        setTimeout(() => setShowShareToast(false), 3000);
+        logAction('SHARE_CHALLENGE', { method: 'clipboard', levelId: currentLevel.id });
+      } catch (err) {
+        console.error('Clipboard failed', err);
+      }
+    }
   };
 
   if (!userName) {
@@ -318,7 +354,23 @@ const App: React.FC = () => {
               {levelIndex < activeLevels.length - 1 ? 'Next Level' : 'Finish'}
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
             </button>
+
+            <button
+              onClick={handleShare}
+              className="mt-3 w-full py-3 text-white rounded-xl font-bold text-lg shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 border border-slate-600"
+            >
+              Challenge Friend
+              <Share2 size={20} />
+            </button>
           </div>
+        </div>
+      )}
+
+      {/* SHARE TOAST */}
+      {showShareToast && (
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[70] bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl border border-green-500 flex items-center gap-2 animate-bounce-slight">
+          <Copy size={16} className="text-green-400" />
+          <span className="font-bold text-sm">Challenge copied to clipboard!</span>
         </div>
       )}
     </div>

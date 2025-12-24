@@ -39,7 +39,7 @@ export type GridEdge = {
 
 // --- LOGGING TYPES ---
 
-export type ActionType = 
+export type ActionType =
   | 'GAME_START'
   | 'LEVEL_LOAD'
   | 'MOVE_PIECE'
@@ -51,7 +51,8 @@ export type ActionType =
   | 'RESET_LEVEL'
   | 'GET_HINT'
   | 'MODE_CHANGE'
-  | 'WIN';
+  | 'WIN'
+  | 'SHARE_CHALLENGE';
 
 export interface ActionLogEntry {
   timestamp: number;
