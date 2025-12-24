@@ -72,6 +72,7 @@ const App: React.FC = () => {
   // --- LOGGING SYSTEM ---
 
   const logAction = (type: ActionType, details?: any) => {
+    if (isReplayMode) return;
     const entry: ActionLogEntry = {
       timestamp: Date.now(),
       type,
