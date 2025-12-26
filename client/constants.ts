@@ -3,7 +3,7 @@ import { LevelData } from './types';
 export const CELL_SIZE = 42; // Increased from 36 to 42 for better visibility
 export const GRID_WIDTH = 12; // Narrower for portrait
 export const GRID_HEIGHT = 24; // Taller for vertical stacking
-export const DEFAULT_TARGET_OFFSET = { x: 4, y: 15 };
+export const DEFAULT_TARGET_OFFSET = { x: 4, y: 13 };
 export const START_OFFSET = { x: 2, y: 0 };
 
 // Helper to generate rectangles
@@ -29,7 +29,7 @@ const ARENA_LEVELS: LevelData[] = [
       ...rect(1, 1).map(c => ({ x: c.x + 2, y: c.y + 8 })),
       ...rect(1, 1).map(c => ({ x: c.x + 6, y: c.y + 8 })),
     ],
-    targetOffset: { x: 2, y: 12 } // Bottom
+    targetOffset: { x: 2, y: 10 } // Bottom
   }
 ];
 
@@ -48,7 +48,7 @@ const GYM_LEVELS: LevelData[] = [
       // 9th row
       ...rect(1, 1).map(c => ({ x: c.x + 1, y: c.y + 8 })),
     ],
-    targetOffset: { x: 2, y: 12 } // Bottom
+    targetOffset: { x: 2, y: 10 } // Bottom
   },
   {
     id: 'practice-level-2',
@@ -63,7 +63,7 @@ const GYM_LEVELS: LevelData[] = [
       // 9th row
       ...rect(1, 1).map(c => ({ x: c.x + 6, y: c.y + 8 })),
     ],
-    targetOffset: { x: 2, y: 12 } // Bottom
+    targetOffset: { x: 2, y: 10 } // Bottom
   },
   {
     id: 'practice-level-3',
@@ -78,7 +78,7 @@ const GYM_LEVELS: LevelData[] = [
       // 9th row
       ...rect(1, 1).map(c => ({ x: c.x + 2, y: c.y + 8 })),
     ],
-    targetOffset: { x: 2, y: 13 } // Bottom
+    targetOffset: { x: 2, y: 11 } // Bottom
   }
 ];
 

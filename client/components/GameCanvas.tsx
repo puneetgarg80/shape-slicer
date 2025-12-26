@@ -637,7 +637,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           </div>
 
           {/* --- FLOATING FOOTER (Mode Selector) --- */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-xs px-4">
+          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 w-full max-w-xs px-4">
             <div id="tour-modes" className="flex bg-slate-800/90 backdrop-blur-md p-1 rounded-2xl shadow-2xl border border-slate-700/50 justify-between">
               <button
                 id="tour-mode-move"
