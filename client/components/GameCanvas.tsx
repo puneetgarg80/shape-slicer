@@ -90,12 +90,6 @@ const TOUR_STEPS: TourStep[] = [
     targetId: "tour-mode-eraser",
     position: "top"
   },
-  {
-    title: "Need Help?",
-    content: "If you get stuck, tap the Sparkles button for an AI-powered hint.",
-    targetId: "tour-hint",
-    position: "bottom"
-  }
 ];
 
 const ObjectiveRow = ({ label, isMet }: { label: string, isMet: boolean }) => (
@@ -502,7 +496,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
               <button onClick={onRedo} disabled={!canRedo} className={`p-1 rounded-full transition ${canRedo ? 'text-slate-400 hover:text-white hover:bg-slate-700 active:scale-95' : 'text-slate-700'}`}><Redo size={18} /></button>
               <div className="w-px h-5 bg-slate-700 mx-0.5"></div>
               <button onClick={handleResetLevel} className="p-1 rounded-full text-slate-400 hover:bg-slate-700 hover:text-white active:scale-95 transition"><RefreshCw size={18} /></button>
-              <button id="tour-hint" onClick={onRequestHint} disabled={!!hint} className={`p-1 rounded-full transition active:scale-95 shadow-sm ${hint ? 'bg-purple-900 text-purple-300' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}><Sparkles size={16} fill="currentColor" /></button>
             </div>
           </div>
         </div>
@@ -665,12 +658,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
         </div>
 
-        {/* --- HINT POPUP --- */}
-        {hint && (
-          <div className="absolute top-24 left-4 right-4 z-40 bg-purple-900/95 backdrop-blur text-purple-100 p-3 rounded-lg text-sm border border-purple-500 shadow-2xl animate-bounce-slight">
-            <strong>AI Hint:</strong> {hint}
-          </div>
-        )}
+
 
         {/* --- RULES MODAL --- */}
         {showRules && (
