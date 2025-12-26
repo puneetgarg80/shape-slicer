@@ -240,7 +240,7 @@ const App: React.FC = () => {
 
   const handleShare = async () => {
     const url = window.location.href;
-    const text = `I just solved Level ${levelIndex + 1} (${currentLevel.name}) in Shape Slicer! Can you beat my score?`;
+    const text = `(${userName}) just solved Level ${levelIndex + 1} in Shape Slicer! Can you beat my score?`;
 
     if (navigator.share) {
       try {
