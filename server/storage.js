@@ -8,11 +8,6 @@ const __dirname = path.dirname(__filename);
 
 const LOGS_DIR = path.join(__dirname, 'logs');
 
-// Ensure local logs directory exists
-if (!fs.existsSync(LOGS_DIR)) {
-    fs.mkdirSync(LOGS_DIR, { recursive: true });
-}
-
 const storageDriver = process.env.STORAGE_DRIVER || 'fs';
 const bucketName = process.env.GCS_BUCKET_NAME;
 
@@ -28,6 +23,11 @@ if (storageDriver === 'gcs') {
         } catch (err) {
             console.error("[STORAGE] Failed to initialize GCS Driver:", err);
         }
+    }
+} else {
+    // Ensure local logs directory exists
+    if (!fs.existsSync(LOGS_DIR)) {
+        fs.mkdirSync(LOGS_DIR, { recursive: true });
     }
 }
 

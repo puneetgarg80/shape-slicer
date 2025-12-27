@@ -15,13 +15,6 @@ const PORT = process.env.PORT || 3200;
 app.use(cors());
 app.use(express.json()); // Parse JSON bodies
 
-const LOGS_DIR = path.join(__dirname, 'logs');
-
-// Ensure logs directory exists
-if (!fs.existsSync(LOGS_DIR)) {
-    fs.mkdirSync(LOGS_DIR, { recursive: true });
-}
-
 const INDEX_DIR = process.env.NODE_ENV === 'production'
     ? path.join(__dirname, '..', 'client', 'dist')
     : path.join(__dirname, '..', 'client');
@@ -43,7 +36,6 @@ app.post('/api/logs', (req, res) => {
 
     const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const filename = `${sessionId}.json`;
-    const filePath = path.join(LOGS_DIR, filename);
 
     const logData = {
         sessionId,
