@@ -24,4 +24,8 @@ COPY --from=client-build /app/client/dist /usr/share/nginx/html
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+# Switch to non-root user for security
+USER node
+
+# Start the server
+CMD ["npm", "start"]
