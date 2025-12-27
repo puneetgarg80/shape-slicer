@@ -35,6 +35,20 @@ const ARENA_LEVELS: LevelData[] = [
 
 const GYM_LEVELS: LevelData[] = [
   {
+    id: 'practice-level-0',
+    name: 'Gym: Level 0',
+    par: 1,
+    targetCells: rect(5, 5), // 5x5 Square (25)
+    initialShape: [
+      ...rect(5, 2), // Top 2 rows
+      // 3rd row
+      ...rect(5, 1).map(c => ({ x: c.x - 1, y: c.y + 2 })),
+      // 4,5th rows
+      ...rect(5, 2).map(c => ({ x: c.x - 1, y: c.y + 3 }))
+    ],
+    targetOffset: { x: 2, y: 10 } // Bottom
+  },
+  {
     id: 'practice-level-1',
     name: 'Gym: Level 1',
     par: 1,

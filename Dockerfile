@@ -22,7 +22,7 @@ COPY --from=client-build /app/client/dist /usr/share/nginx/html
 # Optional: Copy a custom Nginx configuration if needed
 # COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
+EXPOSE 3001
 
 # Switch to non-root user for security
 USER node
