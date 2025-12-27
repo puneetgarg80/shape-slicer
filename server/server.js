@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3200;
 
 app.use(cors());
 app.use(express.json()); // Parse JSON bodies
@@ -21,6 +21,14 @@ const LOGS_DIR = path.join(__dirname, 'logs');
 if (!fs.existsSync(LOGS_DIR)) {
     fs.mkdirSync(LOGS_DIR, { recursive: true });
 }
+
+const INDEX_DIR = path.join(__dirname, '..', 'client', 'dist');
+const INDEX_PATH = path.join(INDEX_DIR, 'index.html');
+
+// Serve static files
+app.use(express.static(INDEX_DIR));
+// Serve public directory for certificates
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Endpoint to save logs
 app.post('/api/logs', (req, res) => {
