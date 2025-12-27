@@ -40,6 +40,7 @@ COPY --from=client-build /app/client/dist /app/client/dist
 EXPOSE 3200
 
 # Switch to non-root user for security
+RUN chown -R node:node /app
 USER node
 
 # Start the server

@@ -22,11 +22,14 @@ if (!fs.existsSync(LOGS_DIR)) {
     fs.mkdirSync(LOGS_DIR, { recursive: true });
 }
 
-const INDEX_DIR = path.join(__dirname, '..', 'client', 'dist');
+const INDEX_DIR = process.env.NODE_ENV === 'production'
+    ? path.join(__dirname, '..', 'client', 'dist')
+    : path.join(__dirname, '..', 'client');
 const INDEX_PATH = path.join(INDEX_DIR, 'index.html');
 
 // Serve static files
 app.use(express.static(INDEX_DIR));
+
 // Serve public directory for certificates
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -58,6 +61,19 @@ app.post('/api/logs', (req, res) => {
             console.error('Error saving log:', err);
             res.status(500).json({ error: 'Failed to save log' });
         });
+});
+
+// SPA Fallback
+app.get('*', (req, res) => {
+    if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    // Check if INDEX_PATH exists before sending
+    if (fs.existsSync(INDEX_PATH)) {
+        res.sendFile(INDEX_PATH);
+    } else {
+        res.status(404).send('Application not built or index.html missing');
+    }
 });
 
 app.listen(PORT, () => {
