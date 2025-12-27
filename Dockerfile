@@ -30,6 +30,7 @@ RUN npm ci --only=production
 
 # Copy server source code
 COPY server/ ./
+
 # Copy built client assets from the build stage
 # The server expects client assets in ../client/dist relative to server/server.js
 # So we copy them to /app/client/dist
