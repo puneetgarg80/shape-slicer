@@ -4,7 +4,7 @@ export const CELL_SIZE = 42; // Increased from 36 to 42 for better visibility
 export const GRID_WIDTH = 12; // Narrower for portrait
 export const GRID_HEIGHT = 24; // Taller for vertical stacking
 export const DEFAULT_TARGET_OFFSET = { x: 4, y: 13 };
-export const START_OFFSET = { x: 2, y: 0 };
+export const START_OFFSET = { x: 2, y: 1 };
 
 // Helper to generate rectangles
 const rect = (w: number, h: number) => {

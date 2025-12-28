@@ -52,9 +52,9 @@ const TOUR_STEPS: TourStep[] = [
       <div>
         Your goal is to
         <ul className="list-disc pl-4 mt-2 space-y-1">
-          <li>Cut given shape into 2 pieces</li>
-          <li>Each piece should have at least 3 squares.</li>
-          <li>Rearrange these pieces to match the target shape</li>
+          <li><b>Cut</b> given shape <b>into 2 pieces</b></li>
+          <li><b>Each piece</b> should have <b>at least 3 squares</b>.</li>
+          <li><b>Rearrange</b> these pieces to <b>match the target shape</b></li>
         </ul>
       </div>
     ),
@@ -628,7 +628,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           </div>
 
           {/* --- FLOATING FOOTER (Mode Selector) --- */}
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 w-full max-w-xs px-4">
+          <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-30 w-full max-w-xs px-4">
             <div id="tour-modes" className="flex bg-slate-800/90 backdrop-blur-md p-1 rounded-2xl shadow-2xl border border-slate-700/50 justify-between">
               <button
                 id="tour-mode-move"
