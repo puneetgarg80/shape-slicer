@@ -24,6 +24,7 @@ interface GameCanvasProps {
   setDrawnEdges: React.Dispatch<React.SetStateAction<Set<string>>>;
   // Navigation
   levelIndex: number;
+  maxReachedLevel: number;
   totalLevels: number;
   onPrevLevel: () => void;
   onNextLevel: () => void;
@@ -107,7 +108,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hint, resetLevel,
   onUndo, onRedo, canUndo, canRedo, onCut,
   drawnEdges, setDrawnEdges,
-  levelIndex, totalLevels, onPrevLevel, onNextLevel, isEditorMode, onCreateLevel,
+  levelIndex, maxReachedLevel, totalLevels, onPrevLevel, onNextLevel, isEditorMode, onCreateLevel,
   onLogAction
 }) => {
   const [mode, setMode] = useState<GameMode>(GameMode.PEN);
@@ -467,7 +468,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                 <span className="text-xs font-bold px-2 text-slate-300 min-w-[3rem] text-center">
                   {levelIndex + 1} / {totalLevels}
                 </span>
-                <button onClick={onNextLevel} disabled={levelIndex === totalLevels - 1} className="p-1 rounded hover:bg-slate-700 disabled:opacity-30 text-slate-300">
+                <button
+                  onClick={onNextLevel}
+                  disabled={levelIndex === totalLevels - 1 || (levelIndex >= maxReachedLevel && !isEditorMode)}
+                  className="p-1 rounded hover:bg-slate-700 disabled:opacity-30 text-slate-300"
+                >
                   <ChevronRight size={16} />
                 </button>
                 {isEditorMode && (

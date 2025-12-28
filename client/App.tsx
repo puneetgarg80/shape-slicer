@@ -28,6 +28,7 @@ const App: React.FC = () => {
 
   const [customLevels, setCustomLevels] = useState<LevelData[]>([]);
   const [levelIndex, setLevelIndex] = useState(0);
+  const [maxReachedLevel, setMaxReachedLevel] = useState(0);
 
   // Flattened Levels
   const activeLevels = [...LEVELS, ...customLevels];
@@ -195,6 +196,12 @@ const App: React.FC = () => {
     if (!showWinModal) {
       logAction('WIN', { levelId: currentLevel.id, cuts: cutCount });
       setShowWinModal(true);
+
+      // Update max reached level if this is the highest level beaten
+      if (levelIndex >= maxReachedLevel) {
+        setMaxReachedLevel(levelIndex + 1);
+      }
+
       confetti({
         particleCount: 100,
         spread: 70,
@@ -205,6 +212,10 @@ const App: React.FC = () => {
 
   const handleNextLevel = () => {
     if (levelIndex < activeLevels.length - 1) {
+      // Prevent skipping levels
+      if (levelIndex + 1 > maxReachedLevel && !isEditorMode) {
+        return;
+      }
       const newIndex = levelIndex + 1;
       setLevelIndex(newIndex);
       loadLevel(activeLevels[newIndex], newIndex, true);
@@ -535,6 +546,7 @@ const App: React.FC = () => {
 
         // Navigation Props
         levelIndex={levelIndex}
+        maxReachedLevel={maxReachedLevel}
         totalLevels={activeLevels.length}
         onPrevLevel={handlePrevLevel}
         onNextLevel={handleNextLevel}
