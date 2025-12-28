@@ -101,13 +101,20 @@ const GYM_LEVELS: LevelData[] = [
     id: 'practice-level-5',
     name: 'Gym: Level 5',
     par: 1,
-    targetCells: rect(4, 4), // 4x4 Square (16)
+    targetCells: rect(6, 5),   // 6x5 Square (3 6)
     initialShape: [
-      ...rect(4, 3), // Top 3 rows
+      ...rect(6, 2), // Top 2 rows
+      // 3rd row
+      ...rect(1, 1).map(c => ({ x: c.x, y: c.y + 2 })),
+      ...rect(4, 1).map(c => ({ x: c.x + 2, y: c.y + 2 })),
       // 4th row
-      ...rect(3, 1).map(c => ({ x: c.x, y: c.y + 3 })),
+      ...rect(6, 1).map(c => ({ x: c.x, y: c.y + 3 })),
       // 5th row
-      ...rect(1, 1).map(c => ({ x: c.x + 1, y: c.y + 4 })),
+      ...rect(1, 1).map(c => ({ x: c.x, y: c.y + 4 })),
+      ...rect(4, 1).map(c => ({ x: c.x + 2, y: c.y + 4 })),
+      // 6th row
+      ...rect(1, 1).map(c => ({ x: c.x + 2, y: c.y + 5 })),
+      ...rect(1, 1).map(c => ({ x: c.x + 4, y: c.y + 5 })),
     ],
     targetOffset: { x: 2, y: 8 } // Bottom
   }
