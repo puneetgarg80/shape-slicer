@@ -313,8 +313,22 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     });
 
     if (cutOccurred) {
-      newPiecesList = newPiecesList.filter(p => !piecesToRemove.includes(p.id));
-      newPiecesList = [...newPiecesList, ...piecesToAdd];
+      const resultingPieces = [
+        ...newPiecesList.filter(p => !piecesToRemove.includes(p.id)),
+        ...piecesToAdd
+      ];
+
+      // Validation: Exactly 2 pieces and each piece has at least 3 squares
+      const validPieceCount = resultingPieces.length === 2;
+      const validPieceSize = resultingPieces.every(p => p.cells.length >= 3);
+
+      if (!validPieceCount || !validPieceSize) {
+        setShowRules(true);
+        setDrawnEdges(new Set());
+        return;
+      }
+
+      newPiecesList = resultingPieces;
       setPieces(newPiecesList);
       setMode(GameMode.MOVE);
       if (piecesToAdd.length > 0) setSelectedPieceId(piecesToAdd[piecesToAdd.length - 1].id);
@@ -672,7 +686,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
               <ul className="space-y-3 text-slate-300 text-sm">
                 <li className="flex gap-3 items-start">
                   <div className="bg-rose-600/20 text-rose-400 p-2 rounded-lg h-fit"><Scissors size={16} /></div>
-                  <div><strong className="text-white block">Cut</strong> Slice shapes along grid lines using the Pen tool.</div>
+                  <div>
+                    <strong className="text-white block">Cut</strong>
+                    Slice shapes along grid lines.
+                    <div className="text-rose-400 font-medium mt-1">Must result in exactly 2 pieces, each with 3+ squares.</div>
+                  </div>
                 </li>
                 <li className="flex gap-3 items-start">
                   <div className="bg-blue-600/20 text-blue-400 p-2 rounded-lg h-fit"><Move size={16} /></div>
