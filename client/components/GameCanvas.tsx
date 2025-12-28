@@ -134,14 +134,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
   // Check for first-time user and auto-start tour
   useEffect(() => {
-    const hasSeenTour = localStorage.getItem('hasSeenWalkthrough');
-    if (!hasSeenTour) {
-      // Delay slightly to ensure UI is ready
-      const timer = setTimeout(() => {
-        setShowTour(true);
-      }, 800);
-      return () => clearTimeout(timer);
-    }
+    // Always show tour on start as requested
+    // Delay slightly to ensure UI is ready
+    const timer = setTimeout(() => {
+      setShowTour(true);
+    }, 800);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleCloseTour = () => {
