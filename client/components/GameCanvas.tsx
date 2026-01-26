@@ -143,6 +143,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
+  // Reset tool to Pen when level changes
+  useEffect(() => {
+    setMode(GameMode.PEN);
+  }, [levelIndex]);
+
   const handleCloseTour = () => {
     setShowTour(false);
     localStorage.setItem('hasSeenWalkthrough', 'true');
