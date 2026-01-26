@@ -250,9 +250,17 @@ const App: React.FC = () => {
     loadLevel(activeLevels[0], 0, true);
   };
 
+  const [hintMessage, setHintMessage] = useState<string | null>(null);
+
   const handleRequestHint = async () => {
     logAction('GET_HINT', { levelId: currentLevel.id });
-    setHintsUnlocked(true);
+
+    if (currentLevel.hints && currentLevel.hints.length > 0) {
+      setHintsUnlocked(true);
+    } else {
+      setHintMessage("No hint available for this level.");
+      setTimeout(() => setHintMessage(null), 3000);
+    }
   };
 
 
@@ -536,6 +544,7 @@ const App: React.FC = () => {
         onWin={handleWin}
         onRequestHint={handleRequestHint}
         hintsUnlocked={hintsUnlocked}
+        hintMessage={hintMessage}
         resetLevel={() => {
           logAction('RESET_LEVEL', { levelId: currentLevel.id });
           loadLevel(currentLevel, levelIndex, false);
