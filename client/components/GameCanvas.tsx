@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Piece, Cell, Coordinate, GameMode, ActionType, HintData } from '../types';
+import { Piece, Cell, Coordinate, GameMode, ActionType } from '../types';
 import { getAbsoluteCells, performCut, pointsToEdges, interpolatePoints, checkSolution, checkShapeMatch, getEdgeAsKey, parseEdgeKey } from '../utils/geometry';
 import { CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, DEFAULT_TARGET_OFFSET, COLORS } from '../constants';
 import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, FlipVertical, Sparkles, RefreshCw, Undo, Redo, PenTool, Eraser, Trash2, Info, X, Target, ChevronLeft, ChevronRight, Plus, Check, Circle, Footprints } from 'lucide-react';
@@ -12,7 +12,6 @@ interface GameCanvasProps {
   targetOffset?: Coordinate;
   onWin: () => void;
   onRequestHint: () => void;
-  hintData: HintData | null;
   hintsUnlocked: boolean;
   resetLevel: () => void;
   onUndo: () => void;
@@ -106,7 +105,7 @@ const ObjectiveRow = ({ label, isMet }: { label: string, isMet: boolean }) => (
 );
 
 const GameCanvas: React.FC<GameCanvasProps> = ({
-  pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hintData, hintsUnlocked, resetLevel,
+  pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hintsUnlocked, resetLevel,
   onUndo, onRedo, canUndo, canRedo, onCut,
   drawnEdges, setDrawnEdges,
   levelIndex, maxReachedLevel, totalLevels, onPrevLevel, onNextLevel, isEditorMode, onCreateLevel,
@@ -694,15 +693,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
 
 
-        {/* --- HINT MESSAGE OVERLAY --- */}
-        {hintData && hintData.message && (
-          <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white px-5 py-3 rounded-xl shadow-2xl border border-yellow-500/50 pointer-events-none animate-fade-in text-center max-w-[240px] z-40 backdrop-blur-md">
-            <div className="flex items-center gap-2 justify-center text-yellow-500 mb-1 font-bold text-xs uppercase tracking-widest">
-              <Sparkles size={14} /> Hint
-            </div>
-            <p className="text-sm font-medium leading-tight">{hintData.message}</p>
-          </div>
-        )}
+
 
         {/* --- RULES MODAL --- */}
         {showRules && (

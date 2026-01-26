@@ -32,7 +32,6 @@ export interface LevelData {
   targetOffset?: Coordinate; // Optional override for target position
   startOffset?: Coordinate; // Optional override for start piece position
   hints?: { x: number; y: number; pieceId: 1 | 2 }[];
-  hintMessage?: string;
 }
 
 export type GridEdge = {
@@ -68,9 +67,4 @@ export interface UserSessionPayload {
   userName: string;
   sessionId: string;
   actions: ActionLogEntry[];
-}
-
-export interface HintData {
-  hintCells: { x: number; y: number; pieceId: 1 | 2 }[];
-  message: string;
 }
