@@ -92,6 +92,12 @@ const TOUR_STEPS: TourStep[] = [
     targetId: "tour-mode-eraser",
     position: "top"
   },
+  {
+    title: "Need a Hint?",
+    content: "Stuck? Tap the sparkles icon to reveal the position of a piece.",
+    targetId: "tour-hint-btn",
+    position: "bottom"
+  },
 ];
 
 const ObjectiveRow = ({ label, isMet }: { label: string, isMet: boolean }) => (
@@ -514,7 +520,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           {/* Row 3: Action Toolbar (Fixed above canvas) */}
           <div className="flex justify-center pt-1">
             <div className="flex items-center gap-2 bg-slate-800 p-1 rounded-full border border-slate-700/50 shadow-sm">
-              <button onClick={onRequestHint} className={`p-1 rounded-full hover:bg-slate-700 hover:text-white transition ${hintsUnlocked ? 'text-yellow-400 bg-slate-700' : 'text-slate-400'}`} title="Get Hint">
+              <button id="tour-hint-btn" onClick={onRequestHint} className={`p-1 rounded-full hover:bg-slate-700 hover:text-white transition ${hintsUnlocked ? 'text-yellow-400 bg-slate-700' : 'text-slate-400'}`} title="Get Hint">
                 <Sparkles size={18} />
               </button>
               <div className="w-px h-5 bg-slate-700 mx-0.5"></div>
