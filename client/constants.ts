@@ -105,8 +105,7 @@ const GYM_LEVELS: LevelData[] = [
     hints: [
       { x: 0, y: 4, pieceId: 1 }, { x: 4, y: 4, pieceId: 1 },
       { x: 2, y: 4, pieceId: 2 }, { x: 3, y: 5, pieceId: 2 }
-    ],
-    hintMessage: "Separate the bottom section."
+    ]
   },
   {
     id: 'practice-level-5',
