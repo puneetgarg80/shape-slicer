@@ -57,6 +57,7 @@ const App: React.FC = () => {
   const [cutCount, setCutCount] = useState(0);
 
   const [hintData, setHintData] = useState<HintData | null>(null);
+  const [hintsUnlocked, setHintsUnlocked] = useState(false);
   const [showWinModal, setShowWinModal] = useState(false);
   const [showShareToast, setShowShareToast] = useState(false);
   const [isGameComplete, setIsGameComplete] = useState(false);
@@ -123,9 +124,22 @@ const App: React.FC = () => {
   };
 
   const loadLevel = (level: LevelData, levelIdx: number, resetStats: boolean = true) => {
-    const { normalized } = normalizePiece(level.initialShape);
-
     const startPos = level.startOffset || START_OFFSET;
+
+    // Inject hints into initialShape before normalization
+    const shapeWithHints = level.initialShape.map(c => {
+      // Match against absolute coordinates on the grid
+      const absX = c.x + startPos.x;
+      const absY = c.y + startPos.y;
+
+      const hint = level.hints?.find(h => h.x === absX && h.y === absY);
+      if (hint) {
+        return { ...c, hintId: hint.pieceId };
+      }
+      return c;
+    });
+
+    const { normalized } = normalizePiece(shapeWithHints);
 
     const initialPiece: Piece = {
       id: 'root-piece',
@@ -143,6 +157,7 @@ const App: React.FC = () => {
     setHistory([initialPieces]);
     setHistoryIndex(0);
     setHintData(null);
+    setHintsUnlocked(false);
     setShowWinModal(false);
     setDrawnEdges(new Set()); // Clear drawings on level load
 
@@ -242,24 +257,18 @@ const App: React.FC = () => {
 
   const handleRequestHint = async () => {
     logAction('GET_HINT', { levelId: currentLevel.id });
+    setHintsUnlocked(true);
 
-    if (currentLevel.hints) {
-      const startPos = currentLevel.startOffset || START_OFFSET;
-      const adjustedHints = currentLevel.hints.map(h => ({
-        ...h,
-        x: h.x + startPos.x,
-        y: h.y + startPos.y
-      }));
-
+    if (currentLevel.hintMessage) {
       setHintData({
-        hintCells: adjustedHints,
-        message: currentLevel.hintMessage || "Here is a clue."
+        hintCells: [], // Not used for rendering anymore
+        message: currentLevel.hintMessage
       });
-    } else {
+      setTimeout(() => setHintData(null), 4000);
+    } else if (!currentLevel.hints || currentLevel.hints.length === 0) {
       setHintData({ hintCells: [], message: "No hint available for this level." });
+      setTimeout(() => setHintData(null), 4000);
     }
-
-    setTimeout(() => setHintData(prev => prev ? { ...prev, message: '' } : null), 4000);
   };
 
 
@@ -543,6 +552,7 @@ const App: React.FC = () => {
         onWin={handleWin}
         onRequestHint={handleRequestHint}
         hintData={hintData}
+        hintsUnlocked={hintsUnlocked}
         resetLevel={() => {
           logAction('RESET_LEVEL', { levelId: currentLevel.id });
           loadLevel(currentLevel, levelIndex, false);

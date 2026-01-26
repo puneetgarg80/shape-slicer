@@ -13,6 +13,7 @@ interface GameCanvasProps {
   onWin: () => void;
   onRequestHint: () => void;
   hintData: HintData | null;
+  hintsUnlocked: boolean;
   resetLevel: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -105,7 +106,7 @@ const ObjectiveRow = ({ label, isMet }: { label: string, isMet: boolean }) => (
 );
 
 const GameCanvas: React.FC<GameCanvasProps> = ({
-  pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hintData, resetLevel,
+  pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hintData, hintsUnlocked, resetLevel,
   onUndo, onRedo, canUndo, canRedo, onCut,
   drawnEdges, setDrawnEdges,
   levelIndex, maxReachedLevel, totalLevels, onPrevLevel, onNextLevel, isEditorMode, onCreateLevel,
@@ -508,7 +509,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           {/* Row 3: Action Toolbar (Fixed above canvas) */}
           <div className="flex justify-center pt-1">
             <div className="flex items-center gap-2 bg-slate-800 p-1 rounded-full border border-slate-700/50 shadow-sm">
-              <button onClick={onRequestHint} className={`p-1 rounded-full hover:bg-slate-700 hover:text-white transition ${hintData ? 'text-yellow-400 bg-slate-700' : 'text-slate-400'}`} title="Get Hint">
+              <button onClick={onRequestHint} className={`p-1 rounded-full hover:bg-slate-700 hover:text-white transition ${hintsUnlocked ? 'text-yellow-400 bg-slate-700' : 'text-slate-400'}`} title="Get Hint">
                 <Sparkles size={18} />
               </button>
               <div className="w-px h-5 bg-slate-700 mx-0.5"></div>
@@ -584,17 +585,26 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
               return (
                 <g key={piece.id} transform={`translate(${deltaX}, ${deltaY})`} style={{ filter: isDragging ? 'drop-shadow(0px 10px 10px rgba(0,0,0,0.5))' : 'none' }}>
                   {absCells.map((c, i) => (
-                    <rect
-                      key={i}
-                      x={c.x * CELL_SIZE}
-                      y={c.y * CELL_SIZE}
-                      width={CELL_SIZE}
-                      height={CELL_SIZE}
-                      fill={piece.color}
-                      stroke="white"
-                      strokeWidth={isSelected ? 2 : 1}
-                      className="transition-colors duration-200"
-                    />
+                    <g key={i}>
+                      <rect
+                        x={c.x * CELL_SIZE}
+                        y={c.y * CELL_SIZE}
+                        width={CELL_SIZE}
+                        height={CELL_SIZE}
+                        fill={piece.color}
+                        stroke="white"
+                        strokeWidth={isSelected ? 2 : 1}
+                        className="transition-colors duration-200"
+                      />
+                      {hintsUnlocked && c.hintId && (
+                        <g transform={`translate(${c.x * CELL_SIZE}, ${c.y * CELL_SIZE})`}>
+                          <rect width={CELL_SIZE} height={CELL_SIZE} fill={c.hintId === 1 ? "#ec4899" : "#3b82f6"} fillOpacity="0.5" />
+                          <text x={CELL_SIZE / 2} y={CELL_SIZE / 2 + 5} textAnchor="middle" fill="white" fontWeight="bold" fontSize="14">
+                            {c.hintId}
+                          </text>
+                        </g>
+                      )}
+                    </g>
                   ))}
                   {isSelected && mode === GameMode.MOVE && !isDragging && (
                     <rect
@@ -626,15 +636,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
               );
             })}
 
-            {/* Hint Visualization */}
-            {hintData && hintData.hintCells.map((h, i) => (
-              <g key={`hint-${i}`} transform={`translate(${h.x * CELL_SIZE}, ${h.y * CELL_SIZE})`}>
-                <rect width={CELL_SIZE} height={CELL_SIZE} fill={h.pieceId === 1 ? "#ec4899" : "#3b82f6"} fillOpacity="0.5" />
-                <text x={CELL_SIZE / 2} y={CELL_SIZE / 2 + 5} textAnchor="middle" fill="white" fontWeight="bold" fontSize="14">
-                  {h.pieceId}
-                </text>
-              </g>
-            ))}
+            {/* Hint Visualization - Now Handled Inside Pieces */}
           </svg>
 
           {/* --- FLOATING ACTION BUTTONS (Right) --- */}

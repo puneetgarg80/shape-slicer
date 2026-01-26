@@ -3,7 +3,9 @@ export type Coordinate = {
   y: number;
 };
 
-export type Cell = Coordinate;
+export interface Cell extends Coordinate {
+  hintId?: number;
+}
 
 export interface Piece {
   id: string;

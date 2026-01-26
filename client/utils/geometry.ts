@@ -13,7 +13,7 @@ export const flipPoint = (p: Coordinate): Coordinate => ({ x: -p.x, y: p.y });
 export const getAbsoluteCells = (piece: Piece): Cell[] => {
   return piece.cells.map(cell => {
     let curr = { ...cell };
-    
+
     // Apply Flip
     if (piece.isFlipped) {
       curr = flipPoint(curr);
@@ -27,6 +27,7 @@ export const getAbsoluteCells = (piece: Piece): Cell[] => {
 
     // Apply Translation
     return {
+      ...cell, // Maintain original properties like hintId
       x: curr.x + piece.position.x,
       y: curr.y + piece.position.y,
     };
@@ -36,12 +37,16 @@ export const getAbsoluteCells = (piece: Piece): Cell[] => {
 // Normalize piece cells so top-left is at (0,0)
 export const normalizePiece = (cells: Cell[]): { normalized: Cell[], offset: Coordinate } => {
   if (cells.length === 0) return { normalized: [], offset: { x: 0, y: 0 } };
-  
+
   const minX = Math.min(...cells.map(c => c.x));
   const minY = Math.min(...cells.map(c => c.y));
 
   return {
-    normalized: cells.map(c => ({ x: c.x - minX, y: c.y - minY })),
+    normalized: cells.map(c => ({
+      ...c, // Preserve metadata
+      x: c.x - minX,
+      y: c.y - minY
+    })),
     offset: { x: minX, y: minY },
   };
 };
@@ -62,7 +67,7 @@ export const checkShapeMatch = (pieces: Piece[], targetCells: Cell[]): boolean =
 
   // Convert to set for O(1) lookups
   const currentSet = new Set(currentShape.map(c => `${c.x},${c.y}`));
-  
+
   // Verify every cell in target exists in current configuration
   for (const c of targetShape) {
     if (!currentSet.has(`${c.x},${c.y}`)) return false;
@@ -86,11 +91,11 @@ export const pointsToEdges = (points: Coordinate[]): GridEdge[] => {
   for (let i = 0; i < points.length - 1; i++) {
     const p1 = points[i];
     const p2 = points[i + 1];
-    
+
     // Determine edge type based on grid logic
     // A vertical edge at (x,y) separates cell (x,y) and (x+1,y).
     // The grid line X=k separates column k-1 and k.
-    
+
     if (p1.x === p2.x) {
       // Vertical movement along line X=p1.x
       // This line separates column p1.x-1 and p1.x
@@ -113,10 +118,10 @@ export const interpolatePoints = (p1: Coordinate, p2: Coordinate): Coordinate[] 
   const points: Coordinate[] = [];
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
-  
+
   // Just return end point if same
   if (dx === 0 && dy === 0) return [];
-  
+
   // X movement then Y movement
   const stepX = dx > 0 ? 1 : -1;
   let currX = p1.x;
@@ -158,7 +163,7 @@ export const performCut = (piece: Piece, cutEdges: GridEdge[]): Piece[] => {
 
   const getNeighbors = (c: Cell): Cell[] => {
     const n: Cell[] = [];
-    
+
     // Right (check vertical edge at x,y)
     if (cellSet.has(`${c.x + 1},${c.y}`) && !cuts.has(`${c.x},${c.y},v`)) {
       n.push({ x: c.x + 1, y: c.y });
