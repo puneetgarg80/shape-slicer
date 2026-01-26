@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Piece, Cell, Coordinate, GameMode, ActionType } from '../types';
+import { Piece, Cell, Coordinate, GameMode, ActionType, HintData } from '../types';
 import { getAbsoluteCells, performCut, pointsToEdges, interpolatePoints, checkSolution, checkShapeMatch, getEdgeAsKey, parseEdgeKey } from '../utils/geometry';
 import { CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, DEFAULT_TARGET_OFFSET, COLORS } from '../constants';
 import { Scissors, Move, RotateCw, RotateCcw, FlipHorizontal, FlipVertical, Sparkles, RefreshCw, Undo, Redo, PenTool, Eraser, Trash2, Info, X, Target, ChevronLeft, ChevronRight, Plus, Check, Circle, Footprints } from 'lucide-react';
@@ -12,7 +12,7 @@ interface GameCanvasProps {
   targetOffset?: Coordinate;
   onWin: () => void;
   onRequestHint: () => void;
-  hint: string | null;
+  hintData: HintData | null;
   resetLevel: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -105,7 +105,7 @@ const ObjectiveRow = ({ label, isMet }: { label: string, isMet: boolean }) => (
 );
 
 const GameCanvas: React.FC<GameCanvasProps> = ({
-  pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hint, resetLevel,
+  pieces, setPieces, targetCells, targetOffset, onWin, onRequestHint, hintData, resetLevel,
   onUndo, onRedo, canUndo, canRedo, onCut,
   drawnEdges, setDrawnEdges,
   levelIndex, maxReachedLevel, totalLevels, onPrevLevel, onNextLevel, isEditorMode, onCreateLevel,
@@ -508,6 +508,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
           {/* Row 3: Action Toolbar (Fixed above canvas) */}
           <div className="flex justify-center pt-1">
             <div className="flex items-center gap-2 bg-slate-800 p-1 rounded-full border border-slate-700/50 shadow-sm">
+              <button onClick={onRequestHint} className={`p-1 rounded-full hover:bg-slate-700 hover:text-white transition ${hintData ? 'text-yellow-400 bg-slate-700' : 'text-slate-400'}`} title="Get Hint">
+                <Sparkles size={18} />
+              </button>
+              <div className="w-px h-5 bg-slate-700 mx-0.5"></div>
               <button onClick={() => setShowRules(true)} className="p-1 rounded-full text-slate-400 hover:bg-slate-700 hover:text-white transition"><Info size={18} /></button>
               <button onClick={onUndo} disabled={!canUndo} className={`p-1 rounded-full transition ${canUndo ? 'text-slate-400 hover:text-white hover:bg-slate-700 active:scale-95' : 'text-slate-700'}`}><Undo size={18} /></button>
               <button onClick={onRedo} disabled={!canRedo} className={`p-1 rounded-full transition ${canRedo ? 'text-slate-400 hover:text-white hover:bg-slate-700 active:scale-95' : 'text-slate-700'}`}><Redo size={18} /></button>
@@ -621,6 +625,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
                 <line key={key} x1={x1 * CELL_SIZE} y1={y1 * CELL_SIZE} x2={x2 * CELL_SIZE} y2={y2 * CELL_SIZE} stroke="#f43f5e" strokeWidth="4" strokeLinecap="round" />
               );
             })}
+
+            {/* Hint Visualization */}
+            {hintData && hintData.hintCells.map((h, i) => (
+              <g key={`hint-${i}`} transform={`translate(${h.x * CELL_SIZE}, ${h.y * CELL_SIZE})`}>
+                <rect width={CELL_SIZE} height={CELL_SIZE} fill={h.pieceId === 1 ? "#ec4899" : "#3b82f6"} fillOpacity="0.5" />
+                <text x={CELL_SIZE / 2} y={CELL_SIZE / 2 + 5} textAnchor="middle" fill="white" fontWeight="bold" fontSize="14">
+                  {h.pieceId}
+                </text>
+              </g>
+            ))}
           </svg>
 
           {/* --- FLOATING ACTION BUTTONS (Right) --- */}
@@ -676,6 +690,17 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         </div>
 
 
+
+
+        {/* --- HINT MESSAGE OVERLAY --- */}
+        {hintData && hintData.message && (
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white px-5 py-3 rounded-xl shadow-2xl border border-yellow-500/50 pointer-events-none animate-fade-in text-center max-w-[240px] z-40 backdrop-blur-md">
+            <div className="flex items-center gap-2 justify-center text-yellow-500 mb-1 font-bold text-xs uppercase tracking-widest">
+              <Sparkles size={14} /> Hint
+            </div>
+            <p className="text-sm font-medium leading-tight">{hintData.message}</p>
+          </div>
+        )}
 
         {/* --- RULES MODAL --- */}
         {showRules && (

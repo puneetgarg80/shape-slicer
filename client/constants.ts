@@ -95,7 +95,12 @@ const GYM_LEVELS: LevelData[] = [
       // 6th row
       ...rect(1, 1).map(c => ({ x: c.x + 3, y: c.y + 5 })),
     ],
-    targetOffset: { x: 2, y: 8 } // Bottom
+    targetOffset: { x: 2, y: 8 }, // Bottom
+    hints: [
+      { x: 0, y: 4, pieceId: 1 }, { x: 4, y: 4, pieceId: 1 },
+      { x: 2, y: 4, pieceId: 2 }, { x: 3, y: 5, pieceId: 2 }
+    ],
+    hintMessage: "Separate the bottom section."
   },
   {
     id: 'practice-level-5',
@@ -116,7 +121,12 @@ const GYM_LEVELS: LevelData[] = [
       ...rect(1, 1).map(c => ({ x: c.x + 2, y: c.y + 5 })),
       ...rect(1, 1).map(c => ({ x: c.x + 4, y: c.y + 5 })),
     ],
-    targetOffset: { x: 2, y: 8 } // Bottom
+    targetOffset: { x: 2, y: 8 }, // Bottom
+    hints: [
+      { x: 2, y: 1, pieceId: 1 }, { x: 3, y: 1, pieceId: 1 },
+      { x: 2, y: 2, pieceId: 2 }, { x: 3, y: 2, pieceId: 2 }
+    ],
+    hintMessage: "Horizontal cut might be tricky. Look closer."
   }
 ];
 

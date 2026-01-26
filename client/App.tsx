@@ -2,10 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import GameCanvas from './components/GameCanvas';
 import LevelBuilder from './components/LevelBuilder';
 import NameModal from './components/NameModal';
-import { Piece, LevelData, ActionLogEntry, ActionType, UserSessionPayload } from './types';
+import { Piece, LevelData, ActionLogEntry, ActionType, UserSessionPayload, HintData } from './types';
 import { LEVELS, COLORS, START_OFFSET } from './constants';
 import { normalizePiece } from './utils/geometry';
-import { getGeminiHint } from './services/geminiService';
 import { PlayCircle, Plus, Dumbbell, Swords, Share2, Copy, Upload } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import ReplayControls from './components/ReplayControls';
@@ -57,7 +56,7 @@ const App: React.FC = () => {
   // Stats
   const [cutCount, setCutCount] = useState(0);
 
-  const [hint, setHint] = useState<string | null>(null);
+  const [hintData, setHintData] = useState<HintData | null>(null);
   const [showWinModal, setShowWinModal] = useState(false);
   const [showShareToast, setShowShareToast] = useState(false);
   const [isGameComplete, setIsGameComplete] = useState(false);
@@ -143,7 +142,7 @@ const App: React.FC = () => {
     setPieces(initialPieces);
     setHistory([initialPieces]);
     setHistoryIndex(0);
-    setHint(null);
+    setHintData(null);
     setShowWinModal(false);
     setDrawnEdges(new Set()); // Clear drawings on level load
 
@@ -243,11 +242,26 @@ const App: React.FC = () => {
 
   const handleRequestHint = async () => {
     logAction('GET_HINT', { levelId: currentLevel.id });
-    setHint("Thinking...");
-    const hintText = await getGeminiHint(pieces, currentLevel.targetCells);
-    setHint(hintText);
-    setTimeout(() => setHint(null), 10000);
+
+    if (currentLevel.hints) {
+      const startPos = currentLevel.startOffset || START_OFFSET;
+      const adjustedHints = currentLevel.hints.map(h => ({
+        ...h,
+        x: h.x + startPos.x,
+        y: h.y + startPos.y
+      }));
+
+      setHintData({
+        hintCells: adjustedHints,
+        message: currentLevel.hintMessage || "Here is a clue."
+      });
+    } else {
+      setHintData({ hintCells: [], message: "No hint available for this level." });
+    }
+
+    setTimeout(() => setHintData(prev => prev ? { ...prev, message: '' } : null), 4000);
   };
+
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -528,7 +542,7 @@ const App: React.FC = () => {
         targetOffset={currentLevel.targetOffset}
         onWin={handleWin}
         onRequestHint={handleRequestHint}
-        hint={hint}
+        hintData={hintData}
         resetLevel={() => {
           logAction('RESET_LEVEL', { levelId: currentLevel.id });
           loadLevel(currentLevel, levelIndex, false);
